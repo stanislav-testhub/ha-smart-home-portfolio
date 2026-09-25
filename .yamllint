@@ -8,3 +8,9 @@ rules:
   comments-indentation: disable
   braces:
     max-spaces-inside: 1
+  # These files are exported/edited via the Home Assistant UI, which writes
+  # sequence items at the same indentation as their parent key (not indented
+  # one level deeper) — a valid, standard HA convention, not a defect.
+  indentation:
+    spaces: consistent
+    indent-sequences: whatever

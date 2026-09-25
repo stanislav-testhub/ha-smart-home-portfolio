@@ -728,7 +728,7 @@ template:
     - name: "USB Storage Total"
       unique_id: openwrt_usb_storage_total_gib
       state: >
-        {{ (states('sensor.usb_storage_used') | float(0) 
+        {{ (states('sensor.usb_storage_used') | float(0)
           + states('sensor.usb_storage_free') | float(0)) | round(2) }}
       unit_of_measurement: "GiB"
       device_class: data_size
@@ -740,7 +740,7 @@ template:
     - name: "Disk sda1 Total Ops"
       unique_id: openwrt_disk_sda1_total_ops
       state: >
-        {{ (states('sensor.disk_sda1_read_ops') | float(0) 
+        {{ (states('sensor.disk_sda1_read_ops') | float(0)
           + states('sensor.disk_sda1_write_ops') | float(0)) | round(2) }}
       unit_of_measurement: "IOPS"
       state_class: measurement
@@ -751,7 +751,7 @@ template:
     - name: "Disk sda1 Total Throughput"
       unique_id: openwrt_disk_sda1_total_throughput
       state: >
-        {{ (states('sensor.disk_sda1_read_throughput') | float(0) 
+        {{ (states('sensor.disk_sda1_read_throughput') | float(0)
           + states('sensor.disk_sda1_write_throughput') | float(0)) | round(3) }}
       unit_of_measurement: "MB/s"
       device_class: data_rate
@@ -787,7 +787,7 @@ template:
         {{ states('sensor.disk_sda1_total_ops') not in ['unknown', 'unavailable']
            and states('sensor.disk_sda1_read_time_ms') not in ['unknown', 'unavailable']
            and states('sensor.disk_sda1_write_time_ms') not in ['unknown', 'unavailable'] }}
-           
+
     - name: "OpenWrt CPU Utilization"
       unique_id: openwrt_cpu_util_percent
       unit_of_measurement: "%"

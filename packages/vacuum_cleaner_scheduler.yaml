@@ -1,5 +1,5 @@
 # ==============================================================================
-# 1. HELPERS (Добавить в configuration.yaml или создать через интерфейс HA)
+# 1. HELPERS (add to configuration.yaml, or create via the HA UI)
 # ==============================================================================
 
 input_text:
@@ -12,83 +12,83 @@ input_boolean:
     name: Vacuum Delayed Mode
     icon: mdi:calendar-clock
 # ══════════════════════════════════════════════════════════════════
-# СКРИПТЫ (scripts.yaml) — полная замена
+# SCRIPTS (scripts.yaml) — full replacement
 # ══════════════════════════════════════════════════════════════════
-script:  
-  vacuum_smart_start:  
-    alias: "Vacuum: Smart start — immediate or delayed"  
-    mode: single  
-    fields:  
-      rooms:  
-        description: "Comma-separated room IDs from [[selection_unwrapped]]"  
-        example: "1,2"  
-      repeats:  
-        description: "Number of passes"  
-        default: 1  
-        example: "1"  
-    sequence:  
+script:
+  vacuum_smart_start:
+    alias: "Vacuum: Smart start — immediate or delayed"
+    mode: single
+    fields:
+      rooms:
+        description: "Comma-separated room IDs from [[selection_unwrapped]]"
+        example: "1,2"
+      repeats:
+        description: "Number of passes"
+        default: 1
+        example: "1"
+    sequence:
 
-      # ── STEP 1: build the selects list as a real Python list ──────────────  
-      # This MUST be its own "- variables:" list item, fully closed before  
-      # the next "- choose:" list item begins.  
-      - variables:  
-          selects_list: >-  
-            {% set ns = namespace(result=[]) %}  
-            {% for r in (rooms | string).split(',') %}  
-              {% set ns.result = ns.result + [[r | trim | int, repeats | default(1) | int, 1, 1, 1]] %}  
-            {% endfor %}  
-            {{ ns.result }}  
+      # ── STEP 1: build the selects list as a real Python list ──────────────
+      # This MUST be its own "- variables:" list item, fully closed before
+      # the next "- choose:" list item begins.
+      - variables:
+          selects_list: >-
+            {% set ns = namespace(result=[]) %}
+            {% for r in (rooms | string).split(',') %}
+              {% set ns.result = ns.result + [[r | trim | int, repeats | default(1) | int, 1, 1, 1]] %}
+            {% endfor %}
+            {{ ns.result }}
 
-      # ── STEP 2: choose between delayed and immediate mode ─────────────────  
-      # This is a SEPARATE list item — note the leading "- choose:" dash  
-      - choose:  
+      # ── STEP 2: choose between delayed and immediate mode ─────────────────
+      # This is a SEPARATE list item — note the leading "- choose:" dash
+      - choose:
 
-          # ── DELAYED MODE ──────────────────────────────────────────────────  
-          - conditions:  
-              - condition: state  
-                entity_id: input_boolean.vacuum_delayed_mode  
-                state: "on"  
-            sequence:  
-              - action: input_text.set_value  
-                target:  
-                  entity_id: input_text.vacuum_pending_rooms  
-                data:  
-                  value: "{{ rooms | string | trim }}"  
-              - action: persistent_notification.create  
-                data:  
-                  notification_id: vacuum_schedule  
-                  title: "🤖 Уборка запланирована"  
-                  message: >-  
-                    {% set room_names = {  
-                      '1': 'Bedroom',  
-                      '2': 'Hall',  
-                      '3': 'Second room',  
-                      '5': 'Kitchen'  
-                    } %}  
-                    {% set selected_ids = (rooms | string).split(',') %}  
-                    {% set ns = namespace(names=[]) %}  
-                    {% for r_id in selected_ids %}  
-                      {% set ns.names = ns.names + [room_names.get(r_id | trim, 'Неизвестная зона ' ~ r_id)] %}  
-                    {% endfor %}  
-                    Комнаты: {{ ns.names | join(', ') }} — будут убраны, как только вы уйдёте. Нажмите 🏠↩ для отмены.  
+          # ── DELAYED MODE ──────────────────────────────────────────────────
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.vacuum_delayed_mode
+                state: "on"
+            sequence:
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.vacuum_pending_rooms
+                data:
+                  value: "{{ rooms | string | trim }}"
+              - action: persistent_notification.create
+                data:
+                  notification_id: vacuum_schedule
+                  title: "🤖 Cleaning scheduled"
+                  message: >-
+                    {% set room_names = {
+                      '1': 'Bedroom',
+                      '2': 'Hall',
+                      '3': 'Second room',
+                      '5': 'Kitchen'
+                    } %}
+                    {% set selected_ids = (rooms | string).split(',') %}
+                    {% set ns = namespace(names=[]) %}
+                    {% for r_id in selected_ids %}
+                      {% set ns.names = ns.names + [room_names.get(r_id | trim, 'Unknown zone ' ~ r_id)] %}
+                    {% endfor %}
+                    Rooms: {{ ns.names | join(', ') }} — will be cleaned once you leave. Tap 🏠↩ to cancel.
 
-        # ── IMMEDIATE MODE (default) ──────────────────────────────────────  
-        default:  
-          - action: xiaomi_miot.call_action  
-            data:  
-              entity_id: vacuum.dreame_mb1808_a399_robot_cleaner  
-              siid: 18  
-              aiid: 1  
-              params:  
-                - piid: 1  
-                  value: 18  
-                - piid: 21  
-                  value: "{{ {'selects': selects_list} | tojson }}"  
-              force_params: true  
+        # ── IMMEDIATE MODE (default) ──────────────────────────────────────
+        default:
+          - action: xiaomi_miot.call_action
+            data:
+              entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+              siid: 18
+              aiid: 1
+              params:
+                - piid: 1
+                  value: 18
+                - piid: 21
+                  value: "{{ {'selects': selects_list} | tojson }}"
+              force_params: true
 
   vacuum_cancel_schedule:
     alias: "Vacuum: Cancel scheduled cleaning"
-    description: "Отменяет отложенную уборку и очищает запомненные комнаты."
+    description: "Cancels the scheduled cleaning and clears the remembered rooms."
     mode: single
     sequence:
       - action: input_text.set_value
@@ -104,91 +104,89 @@ script:
           notification_id: vacuum_schedule
 
 # =====================================================================
-# АВТОМАТИЗАЦИЯ (automations.yaml) — запуск при уходе из дома
+# AUTOMATION (automations.yaml) — runs when the owner leaves home
 # =====================================================================
-automation:  
-  - id: vacuum_clean_pending_when_owner_away  
-    alias: "Vacuum: Start pending rooms when Owner leaves"  
-    mode: single  
-    triggers:  
-      - id: owner_left_home  
-        trigger: state  
-        entity_id: device_tracker.9e96e24d9d12_openwrt  
-        from: "home"  
-        to: "not_home"  
-        for:  
-          minutes: 0  
-    conditions:  
-      - condition: state  
-        entity_id: input_boolean.vacuum_delayed_mode  
-        state: "on"  
-      - condition: template  
-        value_template: "{{ states('input_text.vacuum_pending_rooms') | length > 0 }}"  
-      - condition: time  
-        after: "07:00:00"  
-        before: "22:00:00"  
-      - condition: not  
-        conditions:  
-          - condition: state  
-            entity_id: vacuum.dreame_mb1808_a399_robot_cleaner  
-            state: "cleaning"  
-    actions:  
+automation:
+  - id: vacuum_clean_pending_when_owner_away
+    alias: "Vacuum: Start pending rooms when Owner leaves"
+    mode: single
+    triggers:
+      - id: owner_left_home
+        trigger: state
+        entity_id: device_tracker.9e96e24d9d12_openwrt
+        from: "home"
+        to: "not_home"
+        for:
+          minutes: 0
+    conditions:
+      - condition: state
+        entity_id: input_boolean.vacuum_delayed_mode
+        state: "on"
+      - condition: template
+        value_template: "{{ states('input_text.vacuum_pending_rooms') | length > 0 }}"
+      - condition: time
+        after: "07:00:00"
+        before: "22:00:00"
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+            state: "cleaning"
+    actions:
 
-      # ── STEP 1: Capture saved_rooms BEFORE we touch input_text ────────────  
-      - variables:  
-          saved_rooms: "{{ states('input_text.vacuum_pending_rooms') | string | trim }}"  
+      # ── STEP 1: Capture saved_rooms BEFORE we touch input_text ────────────
+      - variables:
+          saved_rooms: "{{ states('input_text.vacuum_pending_rooms') | string | trim }}"
 
-      # ── STEP 2: Build the selects list from saved IDs ─────────────────────  
-      - variables:  
-          selects_list: >-  
-            {% set ns = namespace(result=[]) %}  
-            {% for r in saved_rooms.split(',') %}  
-              {% set ns.result = ns.result + [[r | trim | int, 1, 1, 1, 1]] %}  
-            {% endfor %}  
-            {{ ns.result }}  
+      # ── STEP 2: Build the selects list from saved IDs ─────────────────────
+      - variables:
+          selects_list: >-
+            {% set ns = namespace(result=[]) %}
+            {% for r in saved_rooms.split(',') %}
+              {% set ns.result = ns.result + [[r | trim | int, 1, 1, 1, 1]] %}
+            {% endfor %}
+            {{ ns.result }}
 
-      # ── STEP 3: Send command to vacuum ────────────────────────────────────  
-      - action: xiaomi_miot.call_action  
-        data:  
-          entity_id: vacuum.dreame_mb1808_a399_robot_cleaner  
-          siid: 18  
-          aiid: 1  
-          params:  
-            - piid: 1  
-              value: 18  
-            - piid: 21  
-              value: "{{ {'selects': selects_list} | tojson }}"  
-          force_params: true  
+      # ── STEP 3: Send command to vacuum ────────────────────────────────────
+      - action: xiaomi_miot.call_action
+        data:
+          entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+          siid: 18
+          aiid: 1
+          params:
+            - piid: 1
+              value: 18
+            - piid: 21
+              value: "{{ {'selects': selects_list} | tojson }}"
+          force_params: true
 
-      # ── STEP 4: Clean up helpers ──────────────────────────────────────────  
-      - action: input_text.set_value  
-        target:  
-          entity_id: input_text.vacuum_pending_rooms  
-        data:  
-          value: ""  
-      - action: input_boolean.turn_off  
-        target:  
-          entity_id: input_boolean.vacuum_delayed_mode  
-      - action: persistent_notification.dismiss  
-        data:  
-          notification_id: vacuum_schedule  
+      # ── STEP 4: Clean up helpers ──────────────────────────────────────────
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.vacuum_pending_rooms
+        data:
+          value: ""
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.vacuum_delayed_mode
+      - action: persistent_notification.dismiss
+        data:
+          notification_id: vacuum_schedule
 
-      # ── STEP 5: Success notification (uses saved_rooms from STEP 1) ───────  
-      - action: persistent_notification.create  
-        data:  
-          notification_id: vacuum_started  
-          title: "🤖 Уборка запущена"  
-          message: >-  
-            {% set room_names = {'1':'Bedroom','2':'Hall','3':'Second room','5':'Kitchen'} %}  
-            {% set ns = namespace(names=[]) %}  
-            {% for r_id in saved_rooms.split(',') %}  
-              {% set ns.names = ns.names + [room_names.get(r_id | trim, 'Зона ' ~ (r_id | trim))] %}  
-            {% endfor %}  
-            Пылесос начал уборку: {{ ns.names | join(', ') }}
-            
-            
-            
-            
+      # ── STEP 5: Success notification (uses saved_rooms from STEP 1) ───────
+      - action: persistent_notification.create
+        data:
+          notification_id: vacuum_started
+          title: "🤖 Cleaning started"
+          message: >-
+            {% set room_names = {'1':'Bedroom','2':'Hall','3':'Second room','5':'Kitchen'} %}
+            {% set ns = namespace(names=[]) %}
+            {% for r_id in saved_rooms.split(',') %}
+              {% set ns.names = ns.names + [room_names.get(r_id | trim, 'Zone ' ~ (r_id | trim))] %}
+            {% endfor %}
+            Vacuum started cleaning: {{ ns.names | join(', ') }}
+
+
 # type: custom:xiaomi-vacuum-map-card
 # title: Xiaomi Vacuum Map Card
 # preset_name: Live map

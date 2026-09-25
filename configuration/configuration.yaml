@@ -1,20 +1,20 @@
-# Базовая конфигурация
+# Base configuration
 default_config:
 
 recorder:
-  purge_keep_days: 7          # уменьшить с дефолтных 10 дней
+  purge_keep_days: 7          # reduced from the 10-day default
   auto_purge: true
   auto_repack: true
-  commit_interval: 20          # записывать в БД каждые 20 сек вместо 1
-  
+  commit_interval: 20          # write to the DB every 20s instead of every 1s
+
 homeassistant:
   packages: !include_dir_named packages
 
-# Темы интерфейса
+# Frontend themes
 frontend:
   themes: !include_dir_merge_named themes
 
-# Безопасность HTTP
+# HTTP hardening
 http:
   use_x_forwarded_for: true
   trusted_proxies:
@@ -32,7 +32,7 @@ xiaomi_miot:
     中档: Strong
     强力: Turbo
 
-# Включение основных файлов
+# Include core files
 automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
@@ -42,20 +42,20 @@ rest_command:
     url: https://hc-ping.com/<HEALTHCHECKS_PING_ID>
     method: GET
 
-input_boolean:  
-  presence_detected:  
-    name: Presence Detected  
-    icon: mdi:account-check 
-    
+input_boolean:
+  presence_detected:
+    name: Presence Detected
+    icon: mdi:account-check
+
   light_manually_turned_off:
     name: Light Manually Turned Off
     icon: mdi:lightbulb-off
-    
+
   drawer_notification_cooldown:
     name: "Drawer Notification Cooldown"
     initial: false
-    icon: mdi:timer-sand  
-    
+    icon: mdi:timer-sand
+
 # Input_number for the Current Electricity Rate sensor
 input_number:
   electricity_rate:
@@ -65,7 +65,7 @@ input_number:
     step: 0.01
     unit_of_measurement: "₴/kWh"
     icon: mdi:currency-uah
-    
+
   power_station_energy_start:
     name: "Power Station - Energy at Start"
     min: 0
@@ -103,7 +103,7 @@ template:
         state: "{{ states('input_number.electricity_rate') }}"
         unit_of_measurement: "₴/kWh"
         state_class: measurement
-        
+
   - sensor:
       - name: "Fixed Power strip consumption"
         unique_id: fixed_power_strip_consumtion
@@ -149,7 +149,7 @@ template:
             {% else %}
               {{ this.attributes.last_reset if this.attributes.last_reset is defined else now().isoformat() }}
             {% endif %}
-            
+
   - sensor:
       - name: "Power Station - Session Energy"
         unique_id: power_station_session_energy

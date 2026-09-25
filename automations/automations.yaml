@@ -168,7 +168,7 @@
       - action: notify.mobile_app_owner_iphone
         metadata: {}
         data:
-          message: "Стирка окончена \U0001F9FA"
+          message: "Laundry finished \U0001F9FA"
       - wait_for_trigger:
         - trigger: numeric_state
           entity_id:
@@ -196,13 +196,13 @@
         - action: notify.mobile_app_owner_iphone
           metadata: {}
           data:
-            message: ✅ Стиральная машина выключена
+            message: ✅ Washing machine turned off
           enabled: false
         else:
         - action: notify.mobile_app_owner_iphone
           metadata: {}
           data:
-            message: ℹ️ Стирка продолжается, выключение отменено
+            message: ℹ️ Laundry still running, shutoff cancelled
           enabled: false
     - conditions:
       - condition: trigger
@@ -590,7 +590,7 @@
               if in_outage %}\n    Power should be back soon.\n  {% else %}\n    No
               outages.\n  {% endif %}\n{% endif %}\n{% if rng != 'none' %}\n  Next
               outage window: {{ rng }}.\n{% endif %}\n{% if dur not in [0, '0', 'No
-              outages', none] %}\n  {# показать 2 вместо 2.0, но 2.5 оставить #}\n
+              outages', none] %}\n  {# show 2 instead of 2.0, but keep 2.5 as-is #}\n
               \ {% set d = dur | float(0) %}\n  Duration: {% if (d % 1) == 0 %}{{
               d | int }}{% else %}{{ d | round(1) }}{% endif %}h.\n{% else %}\n  {%
               if not in_outage %}\n    No more outages scheduled.\n  {% endif %}\n{%
@@ -646,7 +646,7 @@
         enabled: true
 - id: '1734015416130'
   alias: Ban Suspicious IP
-  description: 'Блокирует подозрительные IP-адреса после неудачных попыток входа.
+  description: 'Bans suspicious IP addresses after failed login attempts.
     Requires: input_text.whitelist_ips, input_text.last_banned_ip
 
     '
@@ -709,15 +709,15 @@
         data:
           notification_id: ban_{{ ip_address | replace('.', '_') }}
           title: "\U0001F6AB [Security Alert] IP Banned"
-          message: 'IP-адрес: {{ ip_address }} Время обнаружения: {{ timestamp }}
-            Сообщение: {{ raw_message }} Действие: IP автоматически заблокирован через
+          message: 'IP address: {{ ip_address }} Detected at: {{ timestamp }}
+            Message: {{ raw_message }} Action: IP automatically banned via
             http.ban_ip
 
             '
       - action: notify.notify
         data:
-          title: ⚠️ Подозрительная активность
-          message: IP {{ ip_address }} заблокирован после неудачной попытки входа
+          title: ⚠️ Suspicious activity
+          message: IP {{ ip_address }} banned after a failed login attempt
           data:
             tag: security_alert
             ttl: 0
@@ -950,8 +950,8 @@
   mode: single
 - id: '1737991528596'
   alias: Turn on office light when dusk
-  description: Включает свет в офисе при обнаружении присутствия в период приближения
-    сумерек
+  description: Turns on the office light when presence is detected as dusk
+    approaches
   triggers:
   - entity_id: sensor.hlk_ld2410_56f9_static_target_energy
     above: 30
@@ -1335,7 +1335,7 @@
           data:
             title: "\U0001F504 Network issue"
             message: 'Connection to router lost. Rebooting the system  (attempt {{
-              restart_count + 1 }}/3) Время: {{ now().strftime(''%Y-%m-%d %H:%M:%S'')
+              restart_count + 1 }}/3) Time: {{ now().strftime(''%Y-%m-%d %H:%M:%S'')
               }}
 
               '
