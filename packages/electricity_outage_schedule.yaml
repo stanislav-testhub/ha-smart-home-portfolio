@@ -1,0 +1,972 @@
+rest:
+  - resource: "https://be-svitlo.oe.if.ua/schedule-by-queue"
+    scan_interval: 1800
+    headers:
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0"
+      "Accept": "*/*"
+      "Accept-Language": "en-US,en;q=0.5"
+      "Accept-Encoding": "gzip, deflate, br, zstd"
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+      "Origin": "https://svitlo.oe.if.ua"
+      "Connection": "keep-alive"
+      "Referer": "https://svitlo.oe.if.ua/"
+    params:
+      "queue": >
+        {{ states('input_text.oe_queue') }}
+    method: GET
+    sensor:
+    - name: "OE Today"
+      unique_id: <DEVICE_ID_AUTO_1>
+      value_template: >-
+        {% set today = now().strftime('%d.%m.%Y') %}
+        {% set data = value_json | selectattr("eventDate", "equalto", today) | list %}
+        {% if data | length > 0 %}
+          {% set data = data | last %}
+          {% set queue = data.queues[states('input_text.oe_queue')] %}
+          {{ data.eventDate }};{{ data.scheduleApprovedSince }};
+          {%- for period in queue %}{{ period.from }}-{{ period.to }}-{{ period.status }};{%- endfor %}
+        {% else %}
+          unknown
+        {% endif %}
+    - name: "OE Tomorrow"
+      unique_id: <DEVICE_ID_AUTO_2>
+      value_template: >-
+        {% set tomorrow = (now() + timedelta(days=1)).strftime('%d.%m.%Y') %}
+        {% set data = value_json | selectattr("eventDate", "equalto", tomorrow) | list %}
+        {% if data | length > 0 %}
+          {% set data = data | last %}
+          {% set queue = data.queues[states('input_text.oe_queue')] %}
+          {{ data.eventDate }};{{ data.scheduleApprovedSince }};
+          {%- for period in queue %}{{ period.from }}-{{ period.to }}-{{ period.status }};{%- endfor %}
+        {% else %}
+          unknown
+        {% endif %}
+        
+  - resource: "https://be-svitlo.oe.if.ua/schedule-by-search"
+    scan_interval: 7200
+    headers:
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0"
+      "Accept": "*/*"
+      "Accept-Language": "en-US,en;q=0.5"
+      "Accept-Encoding": "gzip, deflate, br, zstd"
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+      "Origin": "https://svitlo.oe.if.ua"
+      "Connection": "keep-alive"
+      "Referer": "https://svitlo.oe.if.ua/"
+    params:
+      "accountNumber": ""
+      "userSearchChoice": "pob"
+      "address": "<HOME_ADDRESS>"
+    method: POST
+    sensor:
+    - name: "OE Queue"
+      unique_id: <DEVICE_ID_AUTO_3>
+      value_template: >-
+        {% set cur = value_json.get('current') if value_json is mapping else none %}
+        {% if cur is mapping and cur.get('hasQueue') == 'yes' %}
+          {{ cur.get('queue') }}.{{ cur.get('subQueue') }}
+        {% elif cur is mapping and cur.get('hasQueue') == 'no' %}
+          no_queue
+        {% else %}
+          unknown
+        {% endif %}
+
+input_text:
+  last_power_outage_today_state:  
+    name: Last Power Outage Today State  
+  last_power_outage_tomorrow_state:  
+    name: Last Power Outage Tomorrow State  
+  last_power_outage_queue_state:  
+    name: Last Power Outage Queue State
+  oe_queue:
+    name: OE Queue
+
+template:
+  - sensor:
+      # Main power outage info sensor
+      - name: "Power Outage Info"
+        unique_id: power_outage_info_json
+        state: >
+          {% set today_raw = states('sensor.oe_today') %}
+          {% set tomorrow_raw = states('sensor.oe_tomorrow') %}
+          {% set now_ts = as_timestamp(now()) %}
+          
+          {% set ns = namespace(
+            periods=[],
+            current_outage=none,
+            next_outage=none,
+            in_outage=false
+          ) %}
+          
+          {# Parse today's schedule #}
+          {% if today_raw not in ['unknown', 'unavailable', 'none', ''] %}
+            {% set parts = today_raw.split(';') %}
+            {% set today_date = parts[0] %}
+            {% set date_parts = today_date.split('.') %}
+            {% set base_ts = as_timestamp(date_parts[2] ~ '-' ~ date_parts[1] ~ '-' ~ date_parts[0] ~ ' 00:00:00') %}
+            
+            {% for period_str in parts[2:] %}
+              {% if period_str and '-' in period_str %}
+                {% set time_parts = period_str.split('-') %}
+                {% if time_parts | length >= 3 %}
+                  {% set start_time = time_parts[0] %}
+                  {% set end_time = time_parts[1] %}
+                  {% set status = time_parts[2] %}
+                  
+                  {% if status in ['1', '2'] %}
+                    {% set start_h = start_time.split(':')[0] | int %}
+                    {% set start_m = start_time.split(':')[1] | int %}
+                    {% set end_h = end_time.split(':')[0] | int %}
+                    {% set end_m = end_time.split(':')[1] | int %}
+                    
+                    {% set start_ts = base_ts + (start_h * 3600) + (start_m * 60) %}
+                    {% set end_ts = base_ts + (end_h * 3600) + (end_m * 60) %}
+                    
+                    {# Handle midnight crossover #}
+                    {% if end_ts <= start_ts %}
+                      {% set end_ts = end_ts + 86400 %}
+                    {% endif %}
+                    
+                    {% set ns.periods = ns.periods + [{
+                      'start_ts': start_ts,
+                      'end_ts': end_ts,
+                      'range_str': start_time ~ '-' ~ end_time,
+                      'status': status,
+                      'day': 'today'
+                    }] %}
+                  {% endif %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          
+          {# Parse tomorrow's schedule #}
+          {% if tomorrow_raw not in ['unknown', 'unavailable', 'none', ''] %}
+            {% set parts = tomorrow_raw.split(';') %}
+            {% set tomorrow_date = parts[0] %}
+            {% set date_parts = tomorrow_date.split('.') %}
+            {% set base_ts = as_timestamp(date_parts[2] ~ '-' ~ date_parts[1] ~ '-' ~ date_parts[0] ~ ' 00:00:00') %}
+            
+            {% for period_str in parts[2:] %}
+              {% if period_str and '-' in period_str %}
+                {% set time_parts = period_str.split('-') %}
+                {% if time_parts | length >= 3 %}
+                  {% set start_time = time_parts[0] %}
+                  {% set end_time = time_parts[1] %}
+                  {% set status = time_parts[2] %}
+                  
+                  {% if status in ['1', '2'] %}
+                    {% set start_h = start_time.split(':')[0] | int %}
+                    {% set start_m = start_time.split(':')[1] | int %}
+                    {% set end_h = end_time.split(':')[0] | int %}
+                    {% set end_m = end_time.split(':')[1] | int %}
+                    
+                    {% set start_ts = base_ts + (start_h * 3600) + (start_m * 60) %}
+                    {% set end_ts = base_ts + (end_h * 3600) + (end_m * 60) %}
+                    
+                    {# Handle midnight crossover #}
+                    {% if end_ts <= start_ts %}
+                      {% set end_ts = end_ts + 86400 %}
+                    {% endif %}
+                    
+                    {# Check if this merges with today's last outage (cross-midnight) #}
+                    {% set should_merge = false %}
+                    {% if ns.periods | length > 0 %}
+                      {% set last_period = ns.periods[-1] %}
+                      {% if last_period['end_ts'] == start_ts and last_period['day'] == 'today' %}
+                        {% set should_merge = true %}
+                        {% set merged_period = {
+                          'start_ts': last_period['start_ts'],
+                          'end_ts': end_ts,
+                          'range_str': last_period['range_str'].split('-')[0] ~ '-' ~ end_time,
+                          'status': status,
+                          'day': 'today_tomorrow'
+                        } %}
+                        {% set ns.periods = ns.periods[:-1] + [merged_period] %}
+                      {% endif %}
+                    {% endif %}
+                    
+                    {% if not should_merge %}
+                      {% set ns.periods = ns.periods + [{
+                        'start_ts': start_ts,
+                        'end_ts': end_ts,
+                        'range_str': start_time ~ '-' ~ end_time,
+                        'status': status,
+                        'day': 'tomorrow'
+                      }] %}
+                    {% endif %}
+                  {% endif %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          
+          {# Check if currently in outage #}
+          {% for period in ns.periods %}
+            {% if period['start_ts'] <= now_ts < period['end_ts'] %}
+              {% set ns.current_outage = period %}
+              {% set ns.in_outage = true %}
+            {% endif %}
+          {% endfor %}
+          
+          {# Find next outage #}
+          {% if ns.in_outage %}
+            {# Find next outage after current one ends #}
+            {% for period in ns.periods %}
+              {% if period['start_ts'] >= ns.current_outage['end_ts'] and not ns.next_outage %}
+                {% set ns.next_outage = period %}
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            {# Find next outage from now #}
+            {% for period in ns.periods %}
+              {% if period['start_ts'] > now_ts and not ns.next_outage %}
+                {% set ns.next_outage = period %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          
+          {# Calculate values #}
+          {% set time_until_minutes = 0 %}
+          {% set next_duration_hours = 0 %}
+          {% set next_range = 'none' %}
+          {% set next_day = '' %}
+          
+          {% if ns.in_outage %}
+            {# Time until power comes back ON #}
+            {% set time_until_minutes = ((ns.current_outage['end_ts'] - now_ts) / 60) | int %}
+            
+            {# Next outage duration (not current) #}
+            {% if ns.next_outage %}
+              {% set next_duration_hours = ((ns.next_outage['end_ts'] - ns.next_outage['start_ts']) / 3600) %}
+              {% set next_range = ns.next_outage['range_str'] %}
+              {% set next_day = ns.next_outage['day'] %}
+            {% endif %}
+          {% else %}
+            {# Time until next outage starts #}
+            {% if ns.next_outage %}
+              {% set time_until_minutes = ((ns.next_outage['start_ts'] - now_ts) / 60) | int %}
+              {% set next_duration_hours = ((ns.next_outage['end_ts'] - ns.next_outage['start_ts']) / 3600) %}
+              {% set next_range = ns.next_outage['range_str'] %}
+              {% set next_day = ns.next_outage['day'] %}
+            {% endif %}
+          {% endif %}
+          
+          {{ {
+            'in_outage': ns.in_outage,
+            'time_until_minutes': time_until_minutes,
+            'next_duration_hours': next_duration_hours,
+            'next_range': next_range,
+            'next_day': next_day
+          } | tojson }}
+        attributes:
+          in_outage: >
+            {% set state_value = states('sensor.power_outage_info') %}
+            {% if state_value not in ['unknown', 'unavailable', 'none', ''] %}
+              {{ (state_value | from_json).get('in_outage', false) }}
+            {% else %}
+              false
+            {% endif %}
+          time_until_minutes: >
+            {% set state_value = states('sensor.power_outage_info') %}
+            {% if state_value not in ['unknown', 'unavailable', 'none', ''] %}
+              {{ (state_value | from_json).get('time_until_minutes', 0) }}
+            {% else %}
+              0
+            {% endif %}
+          next_duration_hours: >
+            {% set state_value = states('sensor.power_outage_info') %}
+            {% if state_value not in ['unknown', 'unavailable', 'none', ''] %}
+              {{ (state_value | from_json).get('next_duration_hours', 0) }}
+            {% else %}
+              0
+            {% endif %}
+          next_range: >
+            {% set state_value = states('sensor.power_outage_info') %}
+            {% if state_value not in ['unknown', 'unavailable', 'none', ''] %}
+              {{ (state_value | from_json).get('next_range', 'none') }}
+            {% else %}
+              none
+            {% endif %}
+          next_day: >
+            {% set state_value = states('sensor.power_outage_info') %}
+            {% if state_value not in ['unknown', 'unavailable', 'none', ''] %}
+              {{ (state_value | from_json).get('next_day', '') }}
+            {% else %}
+              
+            {% endif %}
+
+      # Time until next outage OR time until power ON
+      - name: "Time Until Next Outage"
+        unique_id: time_until_next_outage
+        state: >
+          {% set minutes = state_attr('sensor.power_outage_info', 'time_until_minutes') | int(0) %}
+          {% if minutes > 0 %}
+            {% set hours = (minutes // 60) | int %}
+            {% set mins = minutes % 60 %}
+            {% if hours > 0 %}
+              {{ hours }}h {{ mins }}m
+            {% else %}
+              {{ mins }}m
+            {% endif %}
+          {% else %}
+            No outages
+          {% endif %}
+        icon: >
+          {% if state_attr('sensor.power_outage_info', 'in_outage') %}
+            mdi:power-plug
+          {% else %}
+            mdi:clock-outline
+          {% endif %}
+
+      # Next outage duration (whole hours if possible)
+      - name: "Next Outage Duration"
+        unique_id: next_outage_duration
+        state: >
+          {% set duration = state_attr('sensor.power_outage_info', 'next_duration_hours') | float(0) %}
+          {% set in_outage = state_attr('sensor.power_outage_info', 'in_outage') %}
+          {% if duration > 0 %}
+            {% if duration % 1 == 0 %}
+              {{ duration | int }}
+            {% else %}
+              {{ duration | round(1) }}
+            {% endif %}
+          {% elif in_outage %}
+            0
+          {% else %}
+            0
+          {% endif %}
+        unit_of_measurement: "h"
+        icon: mdi:timer-outline
+
+      # Next outage time range
+      - name: "Next Outage Time"
+        unique_id: next_outage_time
+        state: >
+          {% set range = state_attr('sensor.power_outage_info', 'next_range') %}
+          {% set day = state_attr('sensor.power_outage_info', 'next_day') %}
+          {% if range and range != 'none' %}
+            {{ range }} ({{ day }})
+          {% else %}
+            No scheduled outages
+          {% endif %}
+        icon: mdi:calendar-clock
+        
+  - sensor:
+      # Fallback sensor for power outage card - TODAY
+      - name: "Power Outage Today card Display"
+        unique_id: power_outage_today_card_display
+        state: >
+          {% set today = states('sensor.oe_today') %}
+          {% set tomorrow = states('sensor.oe_tomorrow') %}
+          
+          {# Condition 1: If today is unknown/unavailable but tomorrow is valid #}
+          {% if today in ['unknown', 'unavailable', 'none', ''] %}
+            {% if tomorrow not in ['unknown', 'unavailable', 'none', ''] %}
+              {{ tomorrow }}
+            {% else %}
+              unknown
+            {% endif %}
+          {% else %}
+            {# Condition 2: Check if next outage is today or tomorrow #}
+            {% set next_day = state_attr('sensor.power_outage_info', 'next_day') %}
+            {% set in_outage = state_attr('sensor.power_outage_info', 'in_outage') %}
+            
+            {# If not in outage AND next outage is tomorrow, show tomorrow #}
+            {% if not in_outage and next_day == 'tomorrow' %}
+              {% if tomorrow not in ['unknown', 'unavailable', 'none', ''] %}
+                {{ tomorrow }}
+              {% else %}
+                {{ today }}
+              {% endif %}
+            {% else %}
+              {# Otherwise show today #}
+              {{ today }}
+            {% endif %}
+          {% endif %}
+        icon: mdi:calendar-today
+
+      # Fallback sensor for power outage card - TOMORROW
+      - name: "Power Outage Tomorrow card Display"
+        unique_id: power_outage_tomorrow_card_display
+        state: >
+          {% set today = states('sensor.oe_today') %}
+          {% set tomorrow = states('sensor.oe_tomorrow') %}
+          
+          {# Condition 1: If today is unknown/unavailable but tomorrow is valid #}
+          {% if today in ['unknown', 'unavailable', 'none', ''] %}
+            {% if tomorrow not in ['unknown', 'unavailable', 'none', ''] %}
+              {# Today shows tomorrow, so tomorrow shows today (which is unknown) #}
+              unknown
+            {% else %}
+              unknown
+            {% endif %}
+          {% else %}
+            {# Condition 2: Check if next outage is today or tomorrow #}
+            {% set next_day = state_attr('sensor.power_outage_info', 'next_day') %}
+            {% set in_outage = state_attr('sensor.power_outage_info', 'in_outage') %}
+            
+            {# If not in outage AND next outage is tomorrow, show tomorrow #}
+            {% if not in_outage and next_day == 'tomorrow' %}
+              {% if tomorrow not in ['unknown', 'unavailable', 'none', ''] %}
+                {# Today shows tomorrow, so tomorrow shows today #}
+                {{ today }}
+              {% else %}
+                {# Today shows today (fallback), so tomorrow shows tomorrow #}
+                {{ tomorrow }}
+              {% endif %}
+            {% else %}
+              {# Today shows today, so tomorrow shows tomorrow #}
+              {{ tomorrow }}
+            {% endif %}
+          {% endif %}
+        icon: mdi:calendar-tomorrow
+        
+  - binary_sensor:
+      name: "Stable Light State"
+      unique_id: stable_light_state
+      delay_on: "00:00:40"  # Задержка включения 40 секунд
+      delay_off: "00:02:00" # Задержка выключения 2 минуты
+      state: >
+        {{ states('sensor.light_indicator_illuminance') | float > 2 }}
+
+automation:        
+- id: '1734015436129'
+  alias: End of outage by Light Status
+  description: Light notification with false alarm protection
+  triggers:
+  - entity_id:
+    - binary_sensor.stable_light_state
+    to: 'on'
+    trigger: state
+    from: 'off'
+  conditions:
+  - condition: numeric_state
+    entity_id: sensor.light_indicator_illuminance
+    above: 2
+  - condition: time
+    after: 07:00:00
+    before: 00:30:00
+  actions:
+  - variables:
+      light_value: '{{ states(''sensor.light_indicator_illuminance'') | float }}'
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ light_value > 2 }}'
+      sequence:
+      - action: notify.notify
+        data:
+          message: >-
+            💡 {% set data = states('sensor.power_outage_info') | from_json %}
+            Electricity is back!
+            {%- if data.next_range == 'none' %} No outages. What to do?
+            {%- else %} Outage scheduled for {{ data.next_range }}. What to do?
+            {%- endif %}
+          data:
+            actions:
+              - action: "TURN_OFF_DEVICES"
+                title: "💡 Prepare to outage finished"
+                activationMode: "background"
+                authenticationRequired: false
+                destructive: false
+              - action: "TURN_ON_DEVICES"
+                title: "🔌 Prepare to outage"
+                activationMode: "background"
+                authenticationRequired: true
+                destructive: false            
+              - action: "IGNORE"
+                title: "Ignore"
+                activationMode: "background"
+                authenticationRequired: false
+                destructive: true
+  - data:
+      message: 'Lighting changes detected: {{ light_value }} lx'
+      level: info
+    action: system_log.write
+    
+- id: handle_device_selection
+  alias: Handle Power Actions
+  triggers:
+  - event_type: mobile_app_notification_action
+    trigger: event
+  conditions: []
+  actions:
+  - choose:
+    # ------------------------------------------------------------------
+    # ACTION: TURN_OFF_DEVICES (Power restored, turn off power station)
+    # ------------------------------------------------------------------
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.event.data.action == 'TURN_OFF_DEVICES' }}"
+      sequence:
+      - sequence:
+        # Turn off power station if it's on
+        - if:
+          - condition: device
+            type: is_on
+            device_id: <DEVICE_POWER_STATION_MAIN>
+            entity_id: <ENTITY_POWER_STATION_MAIN>
+            domain: switch
+          then:
+          - type: turn_off
+            device_id: <DEVICE_POWER_STATION_RELAY>
+            entity_id: <ENTITY_POWER_STATION_RELAY>
+            domain: switch
+            enabled: true
+          - action: select.select_option
+            metadata: {}
+            data:
+              option: 30 min
+            target:
+              entity_id:
+              - select.river_2_max_unit_timeout
+              - select.river_2_max_ac_timeout
+            enabled: true
+        
+        # Turn off guest WiFi if enabled
+        - if:
+          - condition: state
+            entity_id: switch.miwifi_44_df_65_36_d2_15_wifi_guest
+            state: 'on'
+          then:
+          - action: switch.turn_off
+            metadata: {}
+            data: {}
+            target:
+              entity_id: switch.miwifi_44_df_65_36_d2_15_wifi_guest
+          - delay:
+              hours: 0
+              minutes: 0
+              seconds: 30
+              milliseconds: 0
+          - wait_for_trigger:
+            - trigger: state
+              entity_id:
+              - switch.miwifi_44_df_65_36_d2_15_wifi_guest
+              to: 'off'
+            continue_on_timeout: true
+            timeout:
+              hours: 0
+              minutes: 7
+              seconds: 0
+              milliseconds: 0
+          enabled: false
+        
+        # Wait for EcoFlow to turn off
+        - if:
+          - condition: not
+            conditions:
+            - condition: device
+              type: is_off
+              device_id: <DEVICE_ECOFLOW_CHARGER>
+              entity_id: <ENTITY_ECOFLOW_CHARGER>
+              domain: switch
+          then:
+          - wait_for_trigger:
+            - type: turned_off
+              device_id: <DEVICE_ECOFLOW_CHARGER>
+              entity_id: <ENTITY_ECOFLOW_CHARGER>
+              domain: switch
+              trigger: device
+            continue_on_timeout: true
+            timeout:
+              hours: 0
+              minutes: 15
+              seconds: 0
+              milliseconds: 0
+            enabled: true
+        
+        # Send notification about power restored and next outage
+        - action: notify.notify 
+          data:
+            title: ⚡ Power Restored
+            message: >-
+              {% set data = states('sensor.power_outage_info') | from_json %}
+              {% if data.next_range != 'none' %}
+                Next outage scheduled for {{ data.next_range }} ({{ data.next_day }}) 
+                in {{ data.time_until_minutes // 60 }}h {{ data.time_until_minutes % 60 }}m.
+                Duration: {% if data.next_duration_hours % 1 == 0 %}{{ data.next_duration_hours | int }}{% else %}{{ data.next_duration_hours | round(1) }}{% endif %}h
+              {% else %}
+                No more outages scheduled.
+              {% endif %}
+            data:
+               sound: default
+               priority: normal
+               vibrate: true
+               importance: high
+        
+        # Turn on EcoFlow charging
+        - type: turn_on
+          device_id: <DEVICE_ECOFLOW_CHARGER>
+          entity_id: <ENTITY_ECOFLOW_CHARGER>
+          domain: switch
+        
+        # Check if EcoFlow turned on successfully
+        - if:
+          - condition: not
+            conditions:
+            - condition: device
+              type: is_on
+              device_id: <DEVICE_ECOFLOW_CHARGER>
+              entity_id: <ENTITY_ECOFLOW_CHARGER>
+              domain: switch
+          then:
+          - action: notify.notify
+            metadata: {}
+            data:
+              title: EcoFlow is not charging
+              target: {}
+              message: Turn on manually or check logs
+        enabled: true
+    
+    # ------------------------------------------------------------------
+    # ACTION: TURN_ON_DEVICES (Prepare for outage, turn on power station)
+    # ------------------------------------------------------------------
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.event.data.action == 'TURN_ON_DEVICES' }}"
+      sequence:
+      # Turn on power station if it's off
+      - if:
+        - condition: device
+          type: is_off
+          device_id: <DEVICE_POWER_STATION_MAIN>
+          entity_id: <ENTITY_POWER_STATION_MAIN>
+          domain: switch
+        then:
+        - sequence:
+          # Repeat turning on until device responds
+          - repeat:
+              sequence:
+              - type: turn_on
+                device_id: <DEVICE_POWER_STATION_RELAY>
+                entity_id: <ENTITY_POWER_STATION_RELAY>
+                domain: switch
+              until:
+              - condition: device
+                type: is_off
+                device_id: <DEVICE_POWER_STATION_MAIN>
+                entity_id: <ENTITY_POWER_STATION_MAIN>
+                domain: switch
+          
+          # Turn on the main power switch
+          - type: turn_on
+            device_id: <DEVICE_POWER_STATION_MAIN>
+            entity_id: <ENTITY_POWER_STATION_MAIN>
+            domain: switch
+          
+          # Turn on guest WiFi if needed
+          - if:
+            - condition: state
+              entity_id: switch.miwifi_44_df_65_36_d2_15_wifi_guest
+              state: 'off'
+            then:
+            - action: switch.turn_on
+              target:
+                entity_id:
+                - switch.miwifi_44_df_65_36_d2_15_wifi_guest
+              data: {}
+            enabled: false
+        
+        # If power station already on, just check WiFi
+        else:
+        - if:
+          - condition: state
+            entity_id: switch.miwifi_44_df_65_36_d2_15_wifi_guest
+            state: 'off'
+          then:
+          - action: switch.turn_on
+            target:
+              entity_id:
+              - switch.miwifi_44_df_65_36_d2_15_wifi_guest
+            data: {}
+          enabled: false
+  mode: single
+
+- id: '1733914025206'
+  alias: Notifications 30 and 5 minutes before
+  description: Notifications 30 and 5 minutes before power outage
+  triggers:
+  - minutes: '*'
+    trigger: time_pattern
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: >
+          {% set outage = states('sensor.power_outage_info') %}
+          {% if outage not in ['unknown', 'unavailable', 'none', ''] %}
+            {% set data = outage | from_json %}
+            {{ data.time_until_minutes is defined and
+               ((data.time_until_minutes <= 30 and data.time_until_minutes > 29) or 
+                (data.time_until_minutes <= 4 and data.time_until_minutes > 3)) }}
+          {% else %}
+            {{ false }}
+          {% endif %}
+      sequence:
+      - action: homeassistant.update_entity
+        data:
+          entity_id:
+          - sensor.oe_today
+          - sensor.oe_tomorrow
+
+    - conditions:
+      - condition: template
+        value_template: >
+          {% set outage = states('sensor.power_outage_info') %}
+          {% if outage not in ['unknown', 'unavailable', 'none', ''] %}
+            {% set data = outage | from_json %}
+            {{ data.time_until_minutes is defined and 
+               data.next_range != 'none' and 
+               data.in_outage == false and
+               data.time_until_minutes <= 3 and data.time_until_minutes > 2 }}
+          {% else %}
+            {{ false }}
+          {% endif %}
+      sequence:
+      - sequence:
+        - repeat:
+            sequence:
+            - type: turn_on
+              device_id: <DEVICE_POWER_STATION_RELAY>
+              entity_id: <ENTITY_POWER_STATION_RELAY>
+              domain: switch
+            until:
+            - condition: device
+              type: is_off
+              device_id: <DEVICE_POWER_STATION_MAIN>
+              entity_id: <ENTITY_POWER_STATION_MAIN>
+              domain: switch
+          enabled: true
+        - type: turn_on
+          device_id: <DEVICE_POWER_STATION_MAIN>
+          entity_id: <ENTITY_POWER_STATION_MAIN>
+          domain: switch
+          enabled: true
+        - if:
+          - condition: time
+            after: 06:00:00
+            before: '11:00:00'
+          then:
+          - action: select.select_option
+            data:
+              option: 2 hr
+            target:
+              entity_id:
+              - select.river_2_max_unit_timeout
+              - select.river_2_max_ac_timeout
+          else:
+          - action: select.select_option
+            data:
+              option: 30 min
+            target:
+              entity_id:
+              - select.river_2_max_unit_timeout
+              - select.river_2_max_ac_timeout
+          - action: notify.notify
+            data:
+              message: >
+                🔌 {% set data = states('sensor.power_outage_info') | from_json %} 
+                Power outage scheduled for {{ data.next_range }} starts in a few minutes. What to do?
+              data:
+                actions:
+                - action: TURN_OFF_DEVICES
+                  title: "\U0001F4A1 Prepare to outage finished"
+                  activationMode: background
+                  authenticationRequired: false
+                  destructive: false
+                - action: TURN_ON_DEVICES
+                  title: "\U0001F50C Prepare to outage"
+                  activationMode: background
+                  authenticationRequired: true
+                  destructive: false
+                - action: IGNORE
+                  title: Ignore
+                  activationMode: background
+                  authenticationRequired: false
+                  destructive: true
+          enabled: true
+        enabled: true
+
+    - conditions:
+      - condition: template
+        value_template: >
+          {% set outage = states('sensor.power_outage_info') %}
+          {% if outage not in ['unknown', 'unavailable', 'none', ''] %}
+            {% set data = outage | from_json %}
+            {{ data.time_until_minutes is defined and 
+               data.next_range != 'none' and 
+               data.in_outage == false and
+               data.time_until_minutes <= 29 and data.time_until_minutes > 28 }}
+          {% else %}
+            {{ false }}
+          {% endif %}
+      sequence:
+      - if:
+        - condition: device
+          type: is_value
+          device_id: <DEVICE_KITCHEN_SOCKET>
+          entity_id: <ENTITY_KITCHEN_SOCKET_POWER>
+          domain: sensor
+          below: 50
+        then:
+        - type: turn_off
+          device_id: <DEVICE_KITCHEN_SOCKET>
+          entity_id: <ENTITY_KITCHEN_SOCKET>
+          domain: switch
+      - action: notify.notify
+        data:
+          title: ⚡ Power Outage Approaching
+          message: >
+            {% set data = states('sensor.power_outage_info') | from_json %}
+            Power outage scheduled for {{ data.next_range }} in 30m. Duration: {{ data.next_duration_hours | int if data.next_duration_hours % 1 == 0 else data.next_duration_hours | round(1) }}h
+          data:
+            sound: default
+            priority: high
+            vibrate: true
+            importance: high
+  mode: single
+  
+- id: '1734015436128'
+  alias: Outage schedule refresh
+  description: ''
+  triggers:
+  - minutes: '55'
+    trigger: time_pattern
+  - trigger: time
+    at: 00:00:00
+  conditions: []
+  actions:
+  - action: homeassistant.update_entity
+    data:
+      entity_id:
+      - sensor.oe_today
+      - sensor.oe_tomorrow
+  mode: single
+
+- id: '1734015436130'
+  alias: Update OE Queue
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.oe_queue
+    to:
+    id: queue
+  conditions:
+  - condition: not
+    conditions:
+    - condition: state
+      entity_id: sensor.oe_queue
+      state:
+      - unavailable
+    - condition: state
+      entity_id: sensor.oe_queue
+      state:
+      - unknown
+    enabled: true
+  actions:
+  - action: input_text.set_value
+    metadata: {}
+    data:
+      value: '{{ states(''sensor.oe_queue'') }}'
+    target:
+      entity_id: input_text.oe_queue
+  mode: single
+  
+- id: '1730130379666'
+  alias: Power outage schedule added
+  description: Notifies when a power schedule for today or tomorrow is added
+  triggers:
+  - entity_id:
+    - sensor.oe_today
+    to:
+    id: today
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 5
+    from: unknown
+    trigger: state
+  - entity_id:
+    - sensor.oe_tomorrow
+    to:
+    id: tomorrow
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 5
+    from: unknown
+    trigger: state
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id:
+        - today
+      sequence:
+      - data:
+          day: today
+          current: '{{ trigger.to_state.state }}'
+          previous: '{{ trigger.from_state.state }}'
+        action: script.notify_power_outage_schedule_added
+    - conditions:
+      - condition: trigger
+        id:
+        - tomorrow
+      sequence:
+      - data:
+          day: tomorrow
+          current: '{{ trigger.to_state.state }}'
+          previous: '{{ trigger.from_state.state }}'
+        action: script.notify_power_outage_schedule_added
+  mode: single
+- id: '1666130379347'
+  alias: Power outage schedule changed
+  description: Notifies when an existing schedule for today or tomorrow changes
+  triggers:
+  - entity_id:
+    - sensor.oe_today
+    to:
+    id: today
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 5
+    trigger: state
+  - entity_id:
+    - sensor.oe_tomorrow
+    to:
+    id: tomorrow
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 5
+    trigger: state
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id:
+        - today
+      sequence:
+      - data:
+          day: today
+          current: '{{ trigger.to_state.state }}'
+          previous: '{{ trigger.from_state.state }}'
+        action: script.notify_power_outage_schedule_changed_2
+    - conditions:
+      - condition: trigger
+        id:
+        - tomorrow
+      sequence:
+      - data:
+          day: tomorrow
+          current: '{{ trigger.to_state.state }}'
+          previous: '{{ trigger.from_state.state }}'
+        action: script.notify_power_outage_schedule_changed_2
+  mode: single

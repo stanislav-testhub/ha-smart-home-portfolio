@@ -1,0 +1,170 @@
+# Базовая конфигурация
+default_config:
+
+recorder:
+  purge_keep_days: 7          # уменьшить с дефолтных 10 дней
+  auto_purge: true
+  auto_repack: true
+  commit_interval: 20          # записывать в БД каждые 20 сек вместо 1
+  
+homeassistant:
+  packages: !include_dir_named packages
+
+# Темы интерфейса
+frontend:
+  themes: !include_dir_merge_named themes
+
+# Безопасность HTTP
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - <HA_SUPERVISOR_SUBNET>
+    - <HA_SUPERVISOR_HOST_IP>
+    - ::1
+  ip_ban_enabled: true
+  login_attempts_threshold: 2
+
+xiaomi_miot:
+  translations:
+    # Global value translations — applied to all Xiaomi Miot entities
+    安静: Silent
+    标准: Standard
+    中档: Strong
+    强力: Turbo
+
+# Включение основных файлов
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+rest_command:
+  healthchecks_ping:
+    url: https://hc-ping.com/<HEALTHCHECKS_PING_ID>
+    method: GET
+
+input_boolean:  
+  presence_detected:  
+    name: Presence Detected  
+    icon: mdi:account-check 
+    
+  light_manually_turned_off:
+    name: Light Manually Turned Off
+    icon: mdi:lightbulb-off
+    
+  drawer_notification_cooldown:
+    name: "Drawer Notification Cooldown"
+    initial: false
+    icon: mdi:timer-sand  
+    
+# Input_number for the Current Electricity Rate sensor
+input_number:
+  electricity_rate:
+    name: "Electricity cost"
+    min: 0
+    max: 10
+    step: 0.01
+    unit_of_measurement: "₴/kWh"
+    icon: mdi:currency-uah
+    
+  power_station_energy_start:
+    name: "Power Station - Energy at Start"
+    min: 0
+    max: 1000000
+    step: 0.001
+    unit_of_measurement: "kWh"
+
+input_text:
+  whitelist_ips:
+    name: Whitelist IPs
+    initial: "<LAN_IP_1>,<LAN_IP_2>,<LAN_IP_3>,<LAN_IP_4>,<LAN_IP_5>,<LAN_IP_6>"
+    max: 255
+    mode: text
+
+  last_banned_ip:
+    name: Last Banned IP
+    initial: ""
+    max: 100
+    mode: text
+
+template:
+  - sensor:
+      - name: "Washing Machine On Duration"
+        state: >
+          {% if is_state('switch.washing_machine_switch', 'on') %}
+            {% set delta = now() - states.switch.washing_machine_switch.last_changed %}
+            {{ '%02d:%02d' % (delta.total_seconds() // 3600, (delta.total_seconds() // 60) % 60) }}
+          {% else %}
+            00:00
+          {% endif %}
+        icon: mdi:timer
+  - sensor:
+      - name: "Current Electricity Rate"
+        unique_id: current_electricity_rate
+        state: "{{ states('input_number.electricity_rate') }}"
+        unit_of_measurement: "₴/kWh"
+        state_class: measurement
+        
+  - sensor:
+      - name: "Fixed Power strip consumption"
+        unique_id: fixed_power_strip_consumtion
+        unit_of_measurement: "kWh"
+        state_class: "total_increasing"
+        device_class: "energy"
+        state: "{{ states('sensor.power_strip_consumption') }}"
+
+  - trigger:
+      - trigger: state
+        entity_id: sensor.<ZIGBEE_DEVICE_ID_1>_power
+      - trigger: time_pattern
+        minutes: "/1"
+    sensor:
+      - name: "Power Zero Duration"
+        unique_id: power_zero_duration
+        state: >-
+          {% set power = states('sensor.<ZIGBEE_DEVICE_ID_1>_power') | float(0) %}
+          {% if power >= 1 %}
+            0
+          {% else %}
+            {% set last = this.state | float(0) %}
+            {% if trigger.platform == 'time_pattern' %}
+              {{ (last + 0.0167) | round(2) }}
+            {% elif trigger.to_state.state | float(0) < 1 and trigger.from_state.state | float(0) >= 1 %}
+              0
+            {% else %}
+              {{ last }}
+            {% endif %}
+          {% endif %}
+        unit_of_measurement: "h"
+        device_class: duration
+        state_class: measurement
+        icon: mdi:timer-outline
+        availability: >-
+          {{ states('sensor.<ZIGBEE_DEVICE_ID_1>_power') not in ['unknown', 'unavailable'] }}
+        attributes:
+          last_power: >-
+            {{ states('sensor.<ZIGBEE_DEVICE_ID_1>_power') }}
+          last_reset: >-
+            {% if states('sensor.<ZIGBEE_DEVICE_ID_1>_power') | float(0) >= 1 %}
+              {{ now().isoformat() }}
+            {% else %}
+              {{ this.attributes.last_reset if this.attributes.last_reset is defined else now().isoformat() }}
+            {% endif %}
+            
+  - sensor:
+      - name: "Power Station - Session Energy"
+        unique_id: power_station_session_energy
+        unit_of_measurement: "Wh"
+        device_class: energy
+        state_class: total_increasing
+        state: >
+          {% set current = states('sensor.power_station_inlet_socket_energy') | float(0) %}
+          {% set start = states('input_number.power_station_energy_start') | float(0) %}
+          {% set diff_kwh = current - start %}
+          {% set diff_wh = diff_kwh * 1000 %}
+          {% if is_state('switch.power_station_inlet_socket_switch', 'on') and diff_wh >= 0 %}
+            {{ diff_wh | round(1) }}
+          {% else %}
+            0
+          {% endif %}
+        availability: >
+          {{ states('sensor.power_station_inlet_socket_energy') not in ['unavailable', 'unknown', 'none'] }}

@@ -1,0 +1,1582 @@
+- id: '1730129037456'
+  alias: Auto off
+  description: Turns off devices in some scenarios
+  triggers:
+  - type: turned_on
+    device_id: <DEVICE_WASHING_MACHINE>
+    entity_id: <ENTITY_WASHING_MACHINE>
+    domain: switch
+    trigger: device
+    id: washing machine interaction
+  - trigger: time
+    at: 07:00:00
+    id: Water heater off time morning
+    enabled: false
+  - trigger: time
+    at: '17:00:00'
+    id: Water heater off time afternoon
+    enabled: false
+  - trigger: homeassistant
+    event: start
+    id: Home assistant started
+    enabled: false
+  - trigger: numeric_state
+    entity_id:
+    - sensor.washing_machine_current
+    below: 0.35
+    for:
+      hours: 0
+      minutes: 3
+      seconds: 0
+    id: washing_machine_low_consumption
+  - trigger: numeric_state
+    entity_id:
+    - sensor.power_station_inlet_socket_power
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 10
+    below: 50
+    id: smart_relay_low_consumption
+  - trigger: state
+    entity_id:
+    - switch.power_station_inlet_socket
+    to: 'on'
+    id: station_charge
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id:
+        - washing machine interaction
+      - condition: device
+        type: is_on
+        device_id: <DEVICE_POWER_STATION_MAIN>
+        entity_id: <ENTITY_POWER_STATION_MAIN>
+        domain: switch
+      sequence:
+      - delay:
+          hours: 0
+          minutes: 0
+          seconds: 1
+          milliseconds: 0
+      - type: turn_off
+        device_id: <DEVICE_WASHING_MACHINE>
+        entity_id: <ENTITY_WASHING_MACHINE>
+        domain: switch
+    - conditions:
+      - condition: or
+        conditions:
+        - condition: trigger
+          id:
+          - washing machine interaction
+        - condition: trigger
+          id:
+          - Water heater off time morning
+        - condition: trigger
+          id:
+          - Water heater off time afternoon
+        - condition: trigger
+          id:
+          - Home assistant started
+        - condition: trigger
+          id:
+          - station_charge
+      sequence:
+      - if:
+        - condition: or
+          conditions:
+          - condition: and
+            conditions:
+            - condition: trigger
+              id:
+              - Home assistant started
+            - condition: not
+              conditions:
+              - condition: time
+                after: '23:59:00'
+                before: 07:00:00
+              - condition: time
+                after: '11:00:00'
+                before: '17:00:00'
+              enabled: false
+          - condition: trigger
+            id:
+            - Water heater off time morning
+          - condition: trigger
+            id:
+            - Water heater off time afternoon
+          - condition: trigger
+            id:
+            - washing machine interaction
+          - condition: trigger
+            id:
+            - station_charge
+        then:
+        - type: turn_off
+          device_id: <DEVICE_WATER_HEATER>
+          entity_id: <ENTITY_WATER_HEATER>
+          domain: switch
+        - delay:
+            hours: 0
+            minutes: 0
+            seconds: 1
+            milliseconds: 0
+        - if:
+          - condition: device
+            type: is_off
+            device_id: <DEVICE_WATER_HEATER>
+            entity_id: <ENTITY_WATER_HEATER>
+            domain: switch
+          - condition: trigger
+            id:
+            - washing machine interaction
+          - condition: numeric_state
+            entity_id: sensor.washing_machine_power
+            below: 1
+          then:
+          - action: notify.mobile_app_owner_iphone
+            metadata: {}
+            data:
+              message: ✅ Water heater is off
+          else:
+          - if:
+            - condition: trigger
+              id:
+              - washing machine interaction
+            - condition: not
+              conditions:
+              - condition: state
+                entity_id: switch.<ZIGBEE_DEVICE_ID_1>
+                state: 'off'
+            then:
+            - action: notify.mobile_app_owner_iphone
+              metadata: {}
+              data:
+                message: ❌ Water heater isn't off
+    - conditions:
+      - condition: trigger
+        id:
+        - washing_machine_low_consumption
+      - condition: device
+        type: is_on
+        device_id: <DEVICE_WASHING_MACHINE>
+        entity_id: <ENTITY_WASHING_MACHINE>
+        domain: switch
+      sequence:
+      - action: notify.mobile_app_owner_iphone
+        metadata: {}
+        data:
+          message: "Стирка окончена \U0001F9FA"
+      - wait_for_trigger:
+        - trigger: numeric_state
+          entity_id:
+          - sensor.washing_machine_current
+          above: 0.35
+        timeout:
+          minutes: 2
+        continue_on_timeout: true
+      - if:
+        - condition: template
+          value_template: '{{ wait.trigger == none }}'
+        - condition: numeric_state
+          entity_id: sensor.washing_machine_current
+          below: 0.35
+        - condition: device
+          type: is_on
+          device_id: <DEVICE_WASHING_MACHINE>
+          entity_id: <ENTITY_WASHING_MACHINE>
+          domain: switch
+        then:
+        - type: turn_off
+          device_id: <DEVICE_WASHING_MACHINE>
+          entity_id: <ENTITY_WASHING_MACHINE>
+          domain: switch
+        - action: notify.mobile_app_owner_iphone
+          metadata: {}
+          data:
+            message: ✅ Стиральная машина выключена
+          enabled: false
+        else:
+        - action: notify.mobile_app_owner_iphone
+          metadata: {}
+          data:
+            message: ℹ️ Стирка продолжается, выключение отменено
+          enabled: false
+    - conditions:
+      - condition: trigger
+        id:
+        - smart_relay_low_consumption
+      sequence:
+      - repeat:
+          while:
+          - condition: device
+            type: is_on
+            device_id: <DEVICE_ECOFLOW_CHARGER>
+            entity_id: <ENTITY_ECOFLOW_CHARGER>
+            domain: switch
+          sequence:
+          - type: turn_off
+            device_id: <DEVICE_ECOFLOW_CHARGER>
+            entity_id: <ENTITY_ECOFLOW_CHARGER>
+            domain: switch
+      - if:
+        - condition: device
+          type: is_on
+          device_id: <DEVICE_POWER_STATION_MAIN>
+          entity_id: <ENTITY_POWER_STATION_MAIN>
+          domain: switch
+        then:
+        - type: turn_off
+          device_id: <DEVICE_POWER_STATION_MAIN>
+          entity_id: <ENTITY_POWER_STATION_MAIN>
+          domain: switch
+        enabled: false
+  mode: queued
+  max: 10
+- id: '1730130379347'
+  alias: Water heater auto on
+  description: ''
+  triggers:
+  - type: turned_off
+    device_id: <DEVICE_WASHING_MACHINE>
+    entity_id: <ENTITY_WASHING_MACHINE>
+    domain: switch
+    trigger: device
+  - trigger: time_pattern
+    enabled: true
+    minutes: /3
+  conditions:
+  - condition: and
+    conditions:
+    - condition: not
+      conditions:
+      - condition: device
+        type: is_on
+        device_id: <DEVICE_POWER_STATION_MAIN>
+        entity_id: <ENTITY_POWER_STATION_MAIN>
+        domain: switch
+    - condition: device
+      type: is_off
+      device_id: <DEVICE_WASHING_MACHINE>
+      entity_id: <ENTITY_WASHING_MACHINE>
+      domain: switch
+  - condition: or
+    conditions:
+    - condition: time
+      after: '23:59:00'
+      before: 06:40:00
+    - condition: time
+      after: '11:00:00'
+      before: '16:40:00'
+    enabled: false
+  - condition: numeric_state
+    entity_id: sensor.kitchen_socket_power
+    below: 105
+    enabled: false
+  - condition: numeric_state
+    entity_id: sensor.power_station_inlet_socket_power
+    below: 500
+    enabled: false
+  actions:
+  - type: turn_on
+    device_id: <DEVICE_WATER_HEATER>
+    entity_id: <ENTITY_WATER_HEATER>
+    domain: switch
+  mode: single
+- id: '1730132285356'
+  alias: Kitchen socket auto on
+  description: ''
+  triggers:
+  - trigger: time_pattern
+    seconds: /10
+  - trigger: state
+    entity_id:
+    - switch.kitchen_socket_switch
+    from:
+    to: 'off'
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 2
+  - type: turned_off
+    device_id: <DEVICE_KITCHEN_SOCKET>
+    entity_id: <ENTITY_KITCHEN_SOCKET>
+    domain: switch
+    trigger: device
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 2
+  conditions:
+  - condition: not
+    conditions:
+    - condition: device
+      type: is_on
+      device_id: <DEVICE_POWER_STATION_MAIN>
+      entity_id: <ENTITY_POWER_STATION_MAIN>
+      domain: switch
+  actions:
+  - type: turn_on
+    device_id: <DEVICE_KITCHEN_SOCKET>
+    entity_id: <ENTITY_KITCHEN_SOCKET>
+    domain: switch
+  mode: single
+- id: '1730136615998'
+  alias: Keep power strip off tonight
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - switch.zimi_v2_caf3_switch
+    from: unavailable
+    enabled: true
+    to: 'on'
+  conditions:
+  - condition: time
+    after: 01:00:00
+    before: '10:00:00'
+  actions:
+  - type: turn_off
+    device_id: <DEVICE_POWER_STRIP>
+    entity_id: <ENTITY_POWER_STRIP>
+    domain: switch
+  mode: single
+- id: '1730272233567'
+  alias: Healthchecks Ping
+  trigger:
+  - platform: time_pattern
+    minutes: /3
+  action:
+  - service: rest_command.healthchecks_ping
+- id: '1730367216678'
+  alias: HA maintenance (updates + reboot)
+  description: 'Creates a Supervisor full backup, installs available updates, then
+    optionally reboots the host. Scheduled for 03:00, and only runs the maintenance
+    flow on Mon/Wed/Sat.
+
+    '
+  triggers:
+  - trigger: time
+    id: scheduled_0300
+    at: 03:00:00
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: scheduled_0300
+      - condition: time
+        weekday:
+        - mon
+        - wed
+        - sat
+      sequence:
+      - delay: 00:01:00
+      - parallel:
+        - action: update.install
+          target:
+            entity_id:
+            - update.hacs_update
+            - update.xiaomi_cloud_map_extractor_update
+            - update.xiaomi_miot_auto_update
+            - update.mosquitto_broker_update
+            - update.local_tuya_update
+          data: {}
+        - action: update.install
+          target:
+            entity_id: update.home_assistant_supervisor_update
+          data: {}
+        - choose:
+          - conditions:
+            - condition: state
+              entity_id: update.home_assistant_core_update
+              state: 'on'
+            sequence:
+            - action: update.install
+              target:
+                entity_id: update.home_assistant_core_update
+              data: {}
+        - action: update.install
+          target:
+            entity_id: update.home_assistant_operating_system_update
+      - delay: 00:05:00
+      - action: notify.notify
+        data:
+          message: "\U0001F4BE Backup and Update Done"
+      - delay: 00:00:05
+      - action: switch.turn_off
+        target:
+          entity_id: switch.miwifi_44_df_65_36_d2_15_wifi_guest
+      - action: hassio.host_reboot
+        data: {}
+    default: []
+  mode: single
+  max_exceeded: silent
+- id: '1730389191914'
+  alias: Camera issues notification
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - camera.lan_ip_7
+    to:
+    - unknown
+    from:
+    - '0'
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 0
+  - trigger: state
+    entity_id:
+    - camera.lan_ip_7
+    to:
+    - unavailable
+    from:
+    - '0'
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 0
+  conditions: []
+  actions:
+  - action: notify.mobile_app_owner_iphone
+    metadata: {}
+    data:
+      message: "Issue with \U0001F4F7"
+  mode: single
+- id: '1730479742274'
+  alias: Message on HA starts
+  description: ''
+  triggers:
+  - trigger: homeassistant
+    event: start
+  conditions: []
+  actions:
+  - action: notify.mobile_app_owner_iphone
+    metadata: {}
+    data:
+      title: ✅ Maintenance Done
+      message: Home started successfully
+  mode: single
+- id: '1733006744263'
+  alias: Smart bulb control
+  description: ''
+  use_blueprint:
+    path: rdeangel/zigbee2mqtt-tuya-moes-smart-knob-ers-10tzbvk-aa.yaml
+    input:
+      switch: sensor.smart_knob_action
+      button_short_press:
+      - type: toggle
+        device_id: <DEVICE_OFFICE_LIGHT>
+        entity_id: <ENTITY_OFFICE_LIGHT>
+        domain: light
+      - delay:
+          hours: 0
+          minutes: 0
+          seconds: 1
+          milliseconds: 0
+      - if:
+        - condition: device
+          type: is_on
+          device_id: <DEVICE_OFFICE_LIGHT>
+          entity_id: <ENTITY_OFFICE_LIGHT>
+          domain: light
+        then:
+        - repeat:
+            count: 30
+            sequence:
+            - device_id: <DEVICE_OFFICE_LIGHT>
+              domain: light
+              entity_id: <ENTITY_OFFICE_LIGHT>
+              type: brightness_increase
+      button_rotate_left:
+      - if:
+        - condition: device
+          type: is_on
+          device_id: <DEVICE_OFFICE_LIGHT>
+          entity_id: <ENTITY_OFFICE_LIGHT>
+          domain: light
+        then:
+        - device_id: <DEVICE_OFFICE_LIGHT>
+          domain: light
+          entity_id: <ENTITY_OFFICE_LIGHT>
+          type: brightness_decrease
+      button_rotate_right:
+      - if:
+        - condition: device
+          type: is_on
+          device_id: <DEVICE_OFFICE_LIGHT>
+          entity_id: <ENTITY_OFFICE_LIGHT>
+          domain: light
+        then:
+        - device_id: <DEVICE_OFFICE_LIGHT>
+          domain: light
+          entity_id: <ENTITY_OFFICE_LIGHT>
+          type: brightness_increase
+      mode: parallel
+      button_double_press:
+      - action: light.toggle
+        metadata: {}
+        data: {}
+        target:
+          entity_id: light.controller_rgb_ir_95c75d
+      button_long_press:
+      - sequence:
+        - if:
+          - condition: device
+            type: is_on
+            device_id: <DEVICE_POWER_STATION_MAIN>
+            entity_id: <ENTITY_POWER_STATION_MAIN>
+            domain: switch
+          then:
+          - type: turn_off
+            device_id: <DEVICE_POWER_STATION_MAIN>
+            entity_id: <ENTITY_POWER_STATION_MAIN>
+            domain: switch
+          - type: turn_off
+            device_id: <DEVICE_POWER_STATION_RELAY>
+            entity_id: <ENTITY_POWER_STATION_RELAY>
+            domain: switch
+            enabled: true
+          - action: select.select_option
+            metadata: {}
+            data:
+              option: 30 min
+            target:
+              entity_id:
+              - select.river_2_max_unit_timeout
+              - select.river_2_max_ac_timeout
+            enabled: true
+        - if:
+          - condition: state
+            entity_id: switch.miwifi_44_df_65_36_d2_15_wifi_guest
+            state: 'on'
+          then:
+          - action: switch.turn_off
+            metadata: {}
+            data: {}
+            target:
+              entity_id: switch.miwifi_44_df_65_36_d2_15_wifi_guest
+          - delay:
+              hours: 0
+              minutes: 0
+              seconds: 20
+              milliseconds: 0
+          - wait_for_trigger:
+            - trigger: state
+              entity_id:
+              - switch.miwifi_44_df_65_36_d2_15_wifi_guest
+              to: 'off'
+            continue_on_timeout: true
+            timeout:
+              hours: 0
+              minutes: 2
+              seconds: 0
+              milliseconds: 0
+        - data:
+            title: "{% set data = states('sensor.power_outage_info') | from_json({})
+              %} {% if data.get('in_outage', false) %}\n  ⚡ Power Restoring\n{% else
+              %}\n  ⚡ Power Restored\n{% endif %}\n"
+            message: "{% set data = states('sensor.power_outage_info') | from_json({})
+              %} {% set rng = data.get('next_range', 'none') %} {% set mins = data.get('time_until_minutes',
+              0) | int(0) %} {% set dur = data.get('next_duration_hours', 0) %} {%
+              set in_outage = data.get('in_outage', false) %}\n{% if mins > 0 %}\n
+              \ {% set h = mins // 60 %}\n  {% set m = mins % 60 %}\n  {% if in_outage
+              %}\n    Power should be back in {{ h }}h {{ m }}m.\n  {% else %}\n    Next
+              outage starts in {{ h }}h {{ m }}m.\n  {% endif %}\n{% else %}\n  {%
+              if in_outage %}\n    Power should be back soon.\n  {% else %}\n    No
+              outages.\n  {% endif %}\n{% endif %}\n{% if rng != 'none' %}\n  Next
+              outage window: {{ rng }}.\n{% endif %}\n{% if dur not in [0, '0', 'No
+              outages', none] %}\n  {# показать 2 вместо 2.0, но 2.5 оставить #}\n
+              \ {% set d = dur | float(0) %}\n  Duration: {% if (d % 1) == 0 %}{{
+              d | int }}{% else %}{{ d | round(1) }}{% endif %}h.\n{% else %}\n  {%
+              if not in_outage %}\n    No more outages scheduled.\n  {% endif %}\n{%
+              endif %}\n"
+            data:
+              sound: default
+              priority: normal
+              vibrate: true
+              importance: high
+              category: light_actions
+          action: notify.notify
+        - if:
+          - condition: not
+            conditions:
+            - condition: device
+              type: is_off
+              device_id: <DEVICE_SECONDARY_LOAD>
+              entity_id: <ENTITY_SECONDARY_LOAD>
+              domain: switch
+          then:
+          - wait_for_trigger:
+            - type: turned_off
+              device_id: <DEVICE_SECONDARY_LOAD>
+              entity_id: <ENTITY_SECONDARY_LOAD>
+              domain: switch
+              trigger: device
+            continue_on_timeout: true
+            timeout:
+              hours: 0
+              minutes: 15
+              seconds: 0
+              milliseconds: 0
+            enabled: true
+        - type: turn_on
+          device_id: <DEVICE_SECONDARY_LOAD>
+          entity_id: <ENTITY_SECONDARY_LOAD>
+          domain: switch
+        - if:
+          - condition: not
+            conditions:
+            - condition: device
+              type: is_on
+              device_id: <DEVICE_SECONDARY_LOAD>
+              entity_id: <ENTITY_SECONDARY_LOAD>
+              domain: switch
+          then:
+          - action: notify.mobile_app_owner_iphone
+            metadata: {}
+            data:
+              title: EcoFlow is not charging
+              target: {}
+              message: Turn on manually or check logs
+        enabled: true
+- id: '1734015416130'
+  alias: Ban Suspicious IP
+  description: 'Блокирует подозрительные IP-адреса после неудачных попыток входа.
+    Requires: input_text.whitelist_ips, input_text.last_banned_ip
+
+    '
+  mode: single
+  max_exceeded: silent
+  triggers:
+  - trigger: event
+    event_type: system_log_event
+    event_data:
+      level: warning
+    id: login_warning
+  conditions:
+  - condition: template
+    value_template: '{{ trigger.event.data.message is search(''Login attempt.*invalid'',
+      ignorecase=True) }}
+
+      '
+  actions:
+  - variables:
+      raw_message: '{{ trigger.event.data.message }}'
+      ip_match: '{{ raw_message | regex_findall(''(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'')
+        }}
+
+        '
+      ip_address: '{{ ip_match | first if ip_match | length > 0 else ''none'' }}
+
+        '
+      is_valid_ip: "{{ ip_address != 'none' and\n   ip_address is match('^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$')
+        }}\n"
+      whitelist_raw: '{{ states(''input_text.whitelist_ips'', ''<LAN_IP_1>,<LAN_IP_2>'')
+        }}
+
+        '
+      is_whitelisted: '{{ ip_address in whitelist_raw.split('','') | map(''trim'')
+        | list }}
+
+        '
+      timestamp: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ is_valid_ip and not is_whitelisted }}'
+      sequence:
+      - action: system_log.write
+        data:
+          level: warning
+          message: '[Security] Banning IP {{ ip_address }} at {{ timestamp }} after
+            invalid login attempt.
+
+            '
+      - action: http.ban_ip
+        data:
+          ip_address: '{{ ip_address }}'
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.last_banned_ip
+        data:
+          value: '{{ ip_address }} ({{ timestamp }})'
+      - action: persistent_notification.create
+        data:
+          notification_id: ban_{{ ip_address | replace('.', '_') }}
+          title: "\U0001F6AB [Security Alert] IP Banned"
+          message: 'IP-адрес: {{ ip_address }} Время обнаружения: {{ timestamp }}
+            Сообщение: {{ raw_message }} Действие: IP автоматически заблокирован через
+            http.ban_ip
+
+            '
+      - action: notify.notify
+        data:
+          title: ⚠️ Подозрительная активность
+          message: IP {{ ip_address }} заблокирован после неудачной попытки входа
+          data:
+            tag: security_alert
+            ttl: 0
+            priority: high
+    default:
+    - action: system_log.write
+      data:
+        level: info
+        message: '[Security] Skipped ban: {% if ip_address == ''none'' %}No IP found
+          in message. {% elif not is_valid_ip %}Invalid IP format: {{ ip_address }}.
+          {% elif is_whitelisted %}IP {{ ip_address }} is whitelisted. {% endif %}
+          Raw message: {{ raw_message }}
+
+          '
+- id: '1735476271469'
+  alias: Low battery level detection & notification for all battery sensors
+  description: ''
+  use_blueprint:
+    path: sbyx/low-battery-level-detection-notification-for-all-battery-sensors.yaml
+    input:
+      threshold: 20
+      exclude:
+        entity_id:
+        - sensor.<ZIGBEE_DEVICE_ID_2>_battery
+        - sensor.temperature_humidity_sensor_eb30_battery
+        - sensor.smart_knob_battery
+        - sensor.temp_and_humidity_without_display_battery
+        - sensor.vibration_security_device_battery
+        - sensor.<ZIGBEE_DEVICE_ID_3>_battery
+        - sensor.reterminal_e1002_battery_level
+        - sensor.ups_battery_sensor_1_battery_level
+        - sensor.fingerbot_battery
+        - sensor.light_indicator_battery
+      actions:
+      - action: notify.notify
+        metadata: {}
+        data:
+          title: "\U0001FAAB Device Battery Alert"
+          message: '{{ trigger.to_state.attributes.friendly_name | replace(''Battery'',
+            '''') }} battery at {{ trigger.to_state.state }}%. Please replace batteries
+            soon.'
+      day: 0
+- id: '1735479108883'
+  alias: Power station Temperature Safety Monitor
+  description: Monitors balcony temperature for power station safety and sensor availability
+  triggers:
+  - entity_id:
+    - sensor.temp_and_humidity_without_display_temperature
+    above: 37
+    trigger: numeric_state
+    for:
+      hours: 0
+      minutes: 3
+      seconds: 0
+  - entity_id:
+    - sensor.temp_and_humidity_without_display_temperature
+    below: 1
+    trigger: numeric_state
+    for:
+      hours: 0
+      minutes: 3
+      seconds: 0
+  - entity_id:
+    - sensor.temp_and_humidity_without_display_temperature
+    trigger: state
+    to: unavailable
+    for:
+      hours: 0
+      minutes: 3
+      seconds: 0
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: numeric_state
+        entity_id: sensor.temp_and_humidity_without_display_temperature
+        above: 37
+      sequence:
+      - data:
+          title: "\U0001F321️ High Temperature Alert"
+          message: Balcony temperature is {{ states('sensor.temp_and_humidity_without_display_temperature')
+            }}°C. Battery may be at risk above 40°C.
+        action: notify.notify
+    - conditions:
+      - condition: numeric_state
+        entity_id: sensor.temp_and_humidity_without_display_temperature
+        below: 1
+      sequence:
+      - data:
+          title: ❄️ Low Temperature Alert
+          message: Balcony temperature is {{ states('sensor.temp_and_humidity_without_display_temperature')
+            }}°C. Battery may be at risk below 0°C.
+        action: notify.notify
+    default:
+    - data:
+        title: ⚠️ Temperature sensor Alert
+        message: Balcony temperature sensor is unavailable. Please check the device.
+      action: notify.notify
+  mode: single
+- id: '1735593798538'
+  alias: Power Sensor Status Monitor
+  description: Monitor power sensor for unknown state and extended zero power
+  triggers:
+  - entity_id:
+    - sensor.<ZIGBEE_DEVICE_ID_1>_power
+    to: unavailable
+    for:
+      minutes: 5
+    id: unknown_state
+    trigger: state
+  - entity_id: sensor.power_zero_duration
+    above: 8
+    id: zero_power
+    trigger: numeric_state
+    enabled: false
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: unknown_state
+      sequence:
+      - data:
+          message: ⚠️ Power sensor unresponsive for 5 minutes. Please check device
+            connectivity.
+          title: Power Sensor Issue
+        action: notify.notify
+    - conditions:
+      - condition: trigger
+        id: zero_power
+      sequence:
+      - data:
+          message: 'ℹ️ No power consumption detected for {{ states(''sensor.power_zero_duration'')
+            | round(1) }} hours.   Device might be turned off or disconnected.  '
+          title: Extended Zero Power
+        action: notify.notify
+  mode: single
+- id: '1736966440332'
+  alias: Office Presence Detection Controller
+  description: Manages office presence detection based on sensor energy levels
+  triggers:
+  - entity_id:
+    - sensor.hlk_ld2410_56f9_static_target_energy
+    above: 9
+    id: high_energy
+    trigger: numeric_state
+  - entity_id:
+    - sensor.hlk_ld2410_56f9_static_target_energy
+    below: 10
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 0
+    id: low_energy
+    trigger: numeric_state
+  actions:
+  - choose:
+    - conditions:
+      - condition: and
+        conditions:
+        - condition: trigger
+          id: high_energy
+        - condition: not
+          conditions:
+          - condition: and
+            conditions:
+            - condition: numeric_state
+              entity_id: sensor.hlk_ld2410_56f9_detection_distance
+              above: 300
+            - condition: state
+              entity_id: switch.monitor_switch
+              state: 'off'
+      sequence:
+      - target:
+          entity_id: input_boolean.presence_detected
+        action: input_boolean.turn_on
+        data: {}
+      - if:
+        - condition: and
+          conditions:
+          - condition: time
+            after: sensor.sun_next_dusk
+            before: '23:30:00'
+          - condition: device
+            type: is_off
+            device_id: <DEVICE_DESK_LAMP>
+            entity_id: <ENTITY_DESK_LAMP>
+            domain: switch
+        then:
+        - type: turn_on
+          device_id: <DEVICE_OFFICE_LIGHT>
+          entity_id: <ENTITY_OFFICE_LIGHT>
+          domain: light
+          brightness_pct: 100
+      - action: switch.turn_on
+        metadata: {}
+        data: {}
+        target:
+          entity_id: switch.monitor_switch
+    - conditions:
+      - condition: and
+        conditions:
+        - condition: trigger
+          id: low_energy
+        - condition: time
+          after: '11:00:00'
+          before: '23:00:00'
+      sequence:
+      - target:
+          entity_id: input_boolean.presence_detected
+        action: input_boolean.turn_off
+        data: {}
+      - if:
+        - condition: not
+          conditions:
+          - condition: time
+            weekday:
+            - sat
+            - sun
+        then:
+        - action: switch.turn_off
+          metadata: {}
+          data: {}
+          target:
+            entity_id: switch.monitor_switch
+      - type: turn_off
+        device_id: <DEVICE_OFFICE_LIGHT>
+        entity_id: <ENTITY_OFFICE_LIGHT>
+        domain: light
+  mode: single
+- id: '1737991528596'
+  alias: Turn on office light when dusk
+  description: Включает свет в офисе при обнаружении присутствия в период приближения
+    сумерек
+  triggers:
+  - entity_id: sensor.hlk_ld2410_56f9_static_target_energy
+    above: 30
+    trigger: numeric_state
+  - minutes: /5
+    trigger: time_pattern
+  conditions:
+  - condition: and
+    conditions:
+    - condition: numeric_state
+      entity_id: sensor.hlk_ld2410_56f9_static_target_energy
+      above: 30
+    - condition: template
+      value_template: '{% set dusk_time = states(''sensor.sun_next_dusk'') %} {% set
+        window_start = strptime(dusk_time, ''%Y-%m-%d %H:%M:%S'') - timedelta(minutes=35)
+        %} {% set current = now() %} {{ current >= window_start and current <= strptime(dusk_time,
+        ''%Y-%m-%d %H:%M:%S'') }}
+
+        '
+  actions:
+  - target:
+      device_id: <DEVICE_OFFICE_LIGHT>
+    data:
+      brightness_pct: 100
+    action: light.turn_on
+  mode: single
+- id: '1738757794635'
+  alias: RGB+CCT Remote
+  description: ''
+  triggers:
+  - domain: mqtt
+    device_id: <DEVICE_RGB_REMOTE>
+    type: action
+    subtype: on_zone_1
+    trigger: device
+    id: 1_on
+  - domain: mqtt
+    device_id: <DEVICE_RGB_REMOTE>
+    type: action
+    subtype: off_zone_1
+    trigger: device
+    id: 1_off
+  - domain: mqtt
+    device_id: <DEVICE_RGB_REMOTE>
+    type: action
+    subtype: on_zone_2
+    trigger: device
+    id: 2_on
+  - domain: mqtt
+    device_id: <DEVICE_RGB_REMOTE>
+    type: action
+    subtype: off_zone_2
+    trigger: device
+    id: 2_off
+  - domain: mqtt
+    device_id: <DEVICE_RGB_REMOTE>
+    type: action
+    subtype: on_zone_7
+    trigger: device
+    id: 7_on
+  - domain: mqtt
+    device_id: <DEVICE_RGB_REMOTE>
+    type: action
+    subtype: off_zone_7
+    trigger: device
+    id: 7_off
+  - domain: mqtt
+    device_id: <DEVICE_RGB_REMOTE>
+    type: action
+    subtype: off_zone_8
+    trigger: device
+    id: 'off'
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id:
+        - 1_on
+      sequence:
+      - type: turn_on
+        device_id: <DEVICE_OFFICE_LIGHT>
+        entity_id: <ENTITY_OFFICE_LIGHT>
+        domain: light
+        brightness_pct: 100
+    - conditions:
+      - condition: trigger
+        id:
+        - 1_off
+      sequence:
+      - type: turn_off
+        device_id: <DEVICE_OFFICE_LIGHT>
+        entity_id: <ENTITY_OFFICE_LIGHT>
+        domain: light
+    - conditions:
+      - condition: trigger
+        id:
+        - 2_on
+      sequence:
+      - action: light.turn_on
+        metadata: {}
+        target:
+          entity_id: light.lan_ip_8
+        data: {}
+    - conditions:
+      - condition: trigger
+        id:
+        - 2_off
+      sequence:
+      - action: light.turn_off
+        metadata: {}
+        target:
+          entity_id: light.lan_ip_8
+        data: {}
+    - conditions:
+      - condition: trigger
+        id:
+        - 'off'
+      sequence:
+      - type: turn_off
+        device_id: <DEVICE_OFFICE_LIGHT>
+        entity_id: <ENTITY_OFFICE_LIGHT>
+        domain: light
+      - action: light.turn_off
+        metadata: {}
+        target:
+          entity_id: light.lan_ip_8
+        data: {}
+    - conditions:
+      - condition: trigger
+        id:
+        - 7_on
+      sequence:
+      - action: switch.turn_on
+        metadata: {}
+        target:
+          entity_id: switch.power_station_inlet_socket
+        data: {}
+    - conditions:
+      - condition: trigger
+        id:
+        - 7_off
+      sequence:
+      - action: switch.turn_off
+        metadata: {}
+        target:
+          entity_id: switch.power_station_inlet_socket
+        data: {}
+  mode: single
+- id: '1740924096605'
+  alias: Office Workspace Manager
+  description: Manages the workspace (light and monitor) based on presence sensor
+  triggers:
+  - entity_id: sensor.hlk_ld2410_56f9_static_target_energy
+    above: 9
+    id: high_energy
+    trigger: numeric_state
+  - entity_id: sensor.hlk_ld2410_56f9_static_target_energy
+    below: 10
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 0
+    id: low_energy
+    trigger: numeric_state
+  - minutes: /5
+    id: time_check
+    trigger: time_pattern
+  - entity_id: input_boolean.presence_detected
+    from: 'off'
+    to: 'on'
+    id: presence_return
+    trigger: state
+  - entity_id: light.<ENTITY_OFFICE_LIGHT>
+    to: 'off'
+    id: light_turned_off
+    trigger: state
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: light_turned_off
+      - condition: state
+        entity_id: input_boolean.presence_detected
+        state: 'on'
+      sequence:
+      - data:
+          entity_id: input_boolean.light_manually_turned_off
+          value: 'on'
+        action: input_helper.set_variable
+    - conditions:
+      - condition: trigger
+        id: presence_return
+      sequence:
+      - data:
+          entity_id: input_boolean.light_manually_turned_off
+          value: 'off'
+        action: input_helper.set_variable
+    - conditions:
+      - condition: or
+        conditions:
+        - condition: and
+          conditions:
+          - condition: trigger
+            id: high_energy
+          - condition: not
+            conditions:
+            - condition: and
+              conditions:
+              - condition: numeric_state
+                entity_id: sensor.hlk_ld2410_56f9_detection_distance
+                above: 300
+              - condition: state
+                entity_id: switch.monitor_switch
+                state: 'off'
+        - condition: and
+          conditions:
+          - condition: trigger
+            id: time_check
+          - condition: numeric_state
+            entity_id: sensor.hlk_ld2410_56f9_static_target_energy
+            above: 9
+          - condition: not
+            conditions:
+            - condition: and
+              conditions:
+              - condition: numeric_state
+                entity_id: sensor.hlk_ld2410_56f9_detection_distance
+                above: 300
+              - condition: state
+                entity_id: switch.monitor_switch
+                state: 'off'
+      sequence:
+      - target:
+          entity_id: input_boolean.presence_detected
+        action: input_boolean.turn_on
+      - if:
+        - condition: and
+          conditions:
+          - condition: template
+            value_template: '{% set dusk_time = states(''sensor.sun_next_dusk'') %}
+              {% set window_start = strptime(dusk_time, ''%Y-%m-%d %H:%M:%S'') - timedelta(minutes=35)
+              %} {% set current = now() %} {{ current >= window_start and current
+              <= strptime(''23:50:00'', ''%H:%M:%S'') }}
+
+              '
+          - condition: state
+            entity_id: input_boolean.light_manually_turned_off
+            state: 'off'
+        then:
+        - target:
+            entity_id: light.<ENTITY_OFFICE_LIGHT>
+          data:
+            brightness_pct: 100
+            transition: 2
+          action: light.turn_on
+      - target:
+          entity_id: switch.monitor_switch
+        action: switch.turn_on
+    - conditions:
+      - condition: trigger
+        id: low_energy
+      - condition: time
+        after: '11:00:00'
+        before: '23:00:00'
+      sequence:
+      - target:
+          entity_id: input_boolean.presence_detected
+        action: input_boolean.turn_off
+      - if:
+        - condition: not
+          conditions:
+          - condition: time
+            weekday:
+            - sat
+            - sun
+        then:
+        - target:
+            entity_id: switch.monitor_switch
+          action: switch.turn_off
+      - target:
+          entity_id: light.<ENTITY_OFFICE_LIGHT>
+        data:
+          transition: 2
+        action: light.turn_off
+  variables:
+    light_auto_control: true
+  mode: single
+- id: '1754300114111'
+  alias: Secret Drawer Vibration Alert
+  description: Sends notification when drawer vibration is detected
+  triggers:
+  - entity_id: binary_sensor.vibration_security_device_vibration
+    from: 'off'
+    to: 'on'
+    trigger: state
+  conditions:
+  - condition: state
+    entity_id: input_boolean.drawer_notification_cooldown
+    state: 'off'
+  actions:
+  - action: notify.notify
+    metadata: {}
+    data:
+      title: "\U0001F6A8 Drawer Alert"
+      message: Secret drawer vibration detected at {{ now().strftime('%H:%M:%S') }}
+  - target:
+      entity_id: input_boolean.drawer_notification_cooldown
+    action: input_boolean.turn_on
+    data: {}
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 15
+      milliseconds: 0
+  - target:
+      entity_id: input_boolean.drawer_notification_cooldown
+    action: input_boolean.turn_off
+    data: {}
+  mode: restart
+- id: '1754300114133'
+  alias: Restart on network connection loss
+  description: Restarts the system when the connection to the router is lost
+  triggers:
+  - trigger: time_pattern
+    minutes: /2
+  actions:
+  - choose:
+    - conditions:
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: binary_sensor.lan_ip_1
+          state: 'off'
+          for:
+            hours: 0
+            minutes: 2
+            seconds: 0
+        - condition: state
+          entity_id: binary_sensor.lan_ip_1
+          state: unavailable
+          for:
+            hours: 0
+            minutes: 2
+            seconds: 0
+        - condition: state
+          entity_id: binary_sensor.lan_ip_1
+          state: unknown
+          for:
+            hours: 0
+            minutes: 2
+            seconds: 0
+      - condition: numeric_state
+        entity_id: counter.restarts_counter
+        below: 3
+      sequence:
+      - action: counter.increment
+        target:
+          entity_id: counter.restarts_counter
+        data: {}
+        enabled: false
+      - delay: 00:01:00
+      - if:
+        - condition: state
+          entity_id: binary_sensor.lan_ip_1
+          state: 'on'
+        then:
+        - action: system_log.write
+          data:
+            level: info
+            message: Network connection restored after interface reset
+        else:
+        - action: system_log.write
+          data:
+            level: warning
+            message: 'Lost connection to the router. Restarting system (attempt {{
+              restart_count + 1 }}/3)
+
+              '
+        - action: persistent_notification.create
+          data:
+            title: "\U0001F504 Network issue"
+            message: 'Connection to router lost. Rebooting the system  (attempt {{
+              restart_count + 1 }}/3) Время: {{ now().strftime(''%Y-%m-%d %H:%M:%S'')
+              }}
+
+              '
+        - delay: 00:00:30
+        - action: hassio.host_reboot
+          data: {}
+    - conditions:
+      - condition: numeric_state
+        entity_id: counter.restarts_counter
+        above: 2
+      - condition: or
+        conditions:
+        - condition: state
+          entity_id: binary_sensor.lan_ip_1
+          state: 'off'
+          for:
+            hours: 0
+            minutes: 3
+            seconds: 0
+        - condition: state
+          entity_id: binary_sensor.lan_ip_1
+          state: unavailable
+          for:
+            hours: 0
+            minutes: 3
+            seconds: 0
+      sequence:
+      - action: system_log.write
+        data:
+          level: error
+          message: Reboot limit exceeded. Waiting 30 minutes
+      - action: persistent_notification.create
+        data:
+          title: ⚠️ Critical network issue
+          message: "Multiple reboot attempts did not help. Waiting 30 minutes before
+            trying again. Time: {{ now().strftime('%Y-%m-%d %H:%M:%S') }}          \n"
+      - delay: 00:30:00
+      - action: counter.reset
+        target:
+          entity_id: counter.restarts_counter
+        data: {}
+    - conditions:
+      - condition: state
+        entity_id: binary_sensor.lan_ip_1
+        state: 'on'
+        for:
+          hours: 0
+          minutes: 0
+          seconds: 15
+      - condition: numeric_state
+        entity_id: counter.restarts_counter
+        above: 0
+      sequence:
+      - action: counter.reset
+        target:
+          entity_id: counter.restarts_counter
+        data: {}
+      - action: system_log.write
+        data:
+          level: info
+          message: The connection to the router has been restored. Restarts counter
+            is reset
+      - action: persistent_notification.create
+        data:
+          title: ✅ Network restored
+          message: 'Connection to the router restored. Time: {{ now().strftime(''%Y-%m-%d
+            %H:%M:%S'') }}
+
+            '
+  mode: single
+  variables:
+    router_state: '{{ states(''binary_sensor.lan_ip_1'') }}'
+    restart_count: '{{ states(''counter.restarts_counter'') | int(0) }}'
+- id: '1757014984648'
+  alias: Smart Bulb Motion Control
+  description: Turn on light when motion detected and illuminance is low
+  triggers:
+  - entity_id: binary_sensor.<ZIGBEE_DEVICE_ID_4>_occupancy
+    from: 'off'
+    to: 'on'
+    trigger: state
+  - entity_id: binary_sensor.<ZIGBEE_DEVICE_ID_4>_occupancy
+    from: 'on'
+    to: 'off'
+    trigger: state
+  - trigger: numeric_state
+    entity_id:
+    - sensor.<ZIGBEE_DEVICE_ID_4>_target_distance
+    below: 200
+    enabled: false
+  actions:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: binary_sensor.<ZIGBEE_DEVICE_ID_4>_occupancy
+        state: 'on'
+      - condition: numeric_state
+        entity_id: sensor.<ZIGBEE_DEVICE_ID_4>_illuminance
+        below: 100
+      - condition: numeric_state
+        entity_id: sensor.<ZIGBEE_DEVICE_ID_4>_target_distance
+        below: 200
+        enabled: false
+      sequence:
+      - target:
+          entity_id: light.smart_bulb
+        action: light.turn_on
+    - conditions:
+      - condition: state
+        entity_id: binary_sensor.<ZIGBEE_DEVICE_ID_4>_occupancy
+        state: 'off'
+      sequence:
+      - target:
+          entity_id: light.smart_bulb
+        action: light.turn_off
+  mode: restart
+- id: '1762365045936'
+  alias: 'Startup zigbee2mqtt '
+  description: ''
+  triggers:
+  - type: turned_off
+    device_id: <DEVICE_ZIGBEE2MQTT_BRIDGE>
+    entity_id: <ENTITY_ZIGBEE2MQTT_BRIDGE>
+    domain: switch
+    trigger: device
+    id: Zigbee2mqtt
+    for:
+      hours: 0
+      minutes: 3
+      seconds: 0
+  conditions: []
+  actions:
+  - repeat:
+      while:
+      - condition: device
+        type: is_off
+        device_id: <DEVICE_ZIGBEE2MQTT_BRIDGE>
+        entity_id: <ENTITY_ZIGBEE2MQTT_BRIDGE>
+        domain: switch
+      sequence:
+      - action: switch.turn_on
+        metadata: {}
+        target:
+          entity_id: switch.zigbee_restart
+        data: {}
+      - delay:
+          hours: 0
+          minutes: 0
+          seconds: 5
+          milliseconds: 0
+      - type: turn_on
+        device_id: <DEVICE_ZIGBEE2MQTT_BRIDGE>
+        entity_id: <ENTITY_ZIGBEE2MQTT_BRIDGE>
+        domain: switch
+      - delay:
+          hours: 0
+          minutes: 5
+          seconds: 0
+          milliseconds: 0
+  mode: single
+- id: '1768832817395'
+  alias: Power Station reset energy counter
+  description:
+  triggers:
+  - trigger: state
+    entity_id: switch.power_station_inlet_socket_switch
+    to: 'on'
+  conditions: []
+  actions:
+  - delay:
+      seconds: 2
+  - action: input_number.set_value
+    target:
+      entity_id: input_number.power_station_energy_start
+    data:
+      value: '{{ states(''sensor.power_station_inlet_socket_energy'') | float(0) }}'
+  - action: system_log.write
+    data:
+      message: Power Station energy counter reset to {{ states('sensor.power_station_inlet_socket_energy')
+        }} kWh
+      level: info
+  mode: single
+- id: '1773227603956'
+  alias: Kitchen Bulb Failover
+  description: 'When kitchen smart bulb becomes unavailable, turn on LED — but only
+    if current time is within 1 hour after next dusk AND surge power is below 30 W.
+
+    '
+  triggers:
+  - trigger: state
+    entity_id: light.smart_bulb_smart_bulb
+    to: unavailable
+    for:
+      seconds: 0
+    id: bulb_unavailable
+  conditions:
+  - condition: sun
+    after: sunset
+    after_offset: 01:00:00
+  - condition: numeric_state
+    entity_id: sensor.zimi_v2_caf3_surge_power
+    below: 30
+    enabled: true
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: bulb_unavailable
+      - condition: state
+        entity_id: light.lan_ip_8
+        state: 'off'
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: light.lan_ip_8
+  mode: single
+  max_exceeded: silent
+- id: '1776855470667'
+  alias: "\U0001F504 Post-startup reload of flaky integrations"
+  description: 'Only reloads integrations that are actually in a failed state. Runs
+    checks in parallel. Safe to trigger on every startup.
+
+    '
+  triggers:
+  - trigger: homeassistant
+    event: start
+  actions:
+  - delay: 00:02:00
+  - action: homeassistant.reload_config_entry
+    data:
+      entry_id: <CONFIG_ENTRY_ID_1>
+    enabled: '{{ config_entry_attr(''<CONFIG_ENTRY_ID_1>'', ''state'') != ''ConfigEntryState.LOADED''
+      }}'
+  - action: homeassistant.reload_config_entry
+    data:
+      entry_id: <CONFIG_ENTRY_ID_2>
+    enabled: '{{ config_entry_attr(''<CONFIG_ENTRY_ID_2>'', ''state'')
+      != ''ConfigEntryState.LOADED'' }}'
+  - action: homeassistant.reload_config_entry
+    data:
+      entry_id: <CONFIG_ENTRY_ID_3>
+    enabled: '{{ config_entry_attr(''<CONFIG_ENTRY_ID_3>'', ''state'') != ''ConfigEntryState.LOADED''
+      }}'
+  mode: single

@@ -1,0 +1,248 @@
+notify_power_outage_schedule_added:
+  alias: Notify power outage schedule added
+  sequence:
+  - if:
+    - condition: template
+      value_template: "{% set is_valid = current not in ['none', 'unavailable', 'unknown',
+        '']\n  and previous in ['none', 'unavailable', 'unknown', ''] %}\n{{ is_valid
+        and current != previous }}\n"
+    then:
+    - data:
+        title: Power outage schedule added
+        data:
+          clickAction: /ui-lovelace-minimalist/power
+        message: "{%- set cur_cleared = current in ['none', 'unavailable', 'unknown',
+          ''] -%} {%- macro fh(v) %}{{ v | int if v % 1 == 0 else v | round(1) }}h{%
+          endmacro -%} {%- set periods = [] if cur_cleared else (current.split(';')[2:]
+          | select('ne', '') | list) -%} {%- set ns = namespace(red=0, yellow=0) -%}
+          {%- for period in periods -%}\n  {%- if '-' in period -%}\n    {%- set tp
+          = period.split('-') -%}\n    {%- if tp | length >= 3 -%}\n      {%- set
+          sh = tp[0].split(':')[0] | int -%}\n      {%- set sm = tp[0].split(':')[1]
+          | int -%}\n      {%- set eh = tp[1].split(':')[0] | int -%}\n      {%- set
+          em = tp[1].split(':')[1] | int -%}\n      {%- set s = sh * 60 + sm -%}\n
+          \     {%- set e = eh * 60 + em -%}\n      {%- set e = e + 1440 if e <= s
+          else e -%}\n      {%- set dur = (e - s) / 60 -%}\n      {%- if tp[2] ==
+          '1' -%}{%- set ns.red = ns.red + dur -%}\n      {%- elif tp[2] == '2' -%}{%-
+          set ns.yellow = ns.yellow + dur -%}{%- endif -%}\n    {%- endif -%}\n  {%-
+          endif -%}\n{%- endfor -%} {%- set green = 24 - ns.red - ns.yellow -%} {%-
+          if periods | length > 0 -%}\n  {%- set r1_parts = ['⚡️ ' ~ fh(green)] -%}\n
+          \ {%- set r1_parts = r1_parts + ['\U0001F534 ' ~ fh(ns.red)] if ns.red >
+          0 else r1_parts -%}\n  {%- set r1_parts = r1_parts + ['\U0001F7E1 ' ~ fh(ns.yellow)]
+          if ns.yellow > 0 else r1_parts -%}\n  {%- set row1 = r1_parts | join(' •
+          ') -%}\n{%- else -%}\n  {%- set row1 = '⚡️ No outages scheduled' -%}\n{%-
+          endif -%} {%- set outage_state = states('sensor.power_outage_info') -%}
+          {%- if outage_state not in ['unknown', 'unavailable', 'none', ''] -%}\n
+          \ {%- set info = outage_state | from_json -%}\n  {%- set nr = info.get('next_range',
+          'none') -%}\n  {%- set tu = info.get('time_until_minutes', 0) | int -%}\n
+          \ {%- set nd = info.get('next_duration_hours', 0) -%}\n  {%- if nr != 'none'
+          -%}\n    {%- set ts = (tu // 60) ~ 'h ' ~ (tu % 60) ~ 'm' if tu >= 60 else
+          (tu % 60) ~ 'm' -%}\n    {%- set row2 = 'Next: ' ~ nr ~ ' (in ' ~ ts ~ ')
+          • ' ~ fh(nd) -%}\n  {%- else -%}\n  {%- endif -%}\n{%- else -%}\n  {%- set
+          row2 = 'Schedule unavailable' -%}\n{%- endif -%} {{- row1 ~ '\\n' ~ row2
+          -}}"
+      action: notify.notify
+  fields:
+    previous:
+      selector:
+        text:
+      name: previous
+      required: true
+    current:
+      selector:
+        text:
+      name: current
+      required: true
+    day:
+      selector:
+        text:
+      name: day
+      required: true
+  description: ''
+notify_power_outage_schedule_changed_2:
+  alias: Notify power outage schedule changed
+  sequence:
+  - if:
+    - condition: template
+      value_template: "{% set cur_valid = current not in ['none', 'unavailable', 'unknown',
+        ''] %} {% set prev_valid = previous not in ['none', 'unavailable', 'unknown',
+        ''] %} {% set cur_cleared = current in ['none', 'unavailable', 'unknown',
+        ''] and prev_valid %} {% if cur_valid and prev_valid %}\n  {% set current_date
+        = current.split(';')[0] %}\n  {% set previous_date = previous.split(';')[0]
+        %}\n  {% set current_data = ';'.join(current.split(';')[2:]) %}\n  {% set
+        previous_data = ';'.join(previous.split(';')[2:]) %}\n  {{ current_date ==
+        previous_date and current_data != previous_data }}\n{% elif cur_cleared %}\n
+        \ {{ true }}\n{% else %}\n  {{ false }}\n{% endif %}\n"
+    then:
+    - data:
+        title: Power outage schedule changed
+        data:
+          clickAction: /ui-lovelace-minimalist/power
+        message: "{%- set cur_cleared = current in ['none', 'unavailable', 'unknown',
+          ''] -%} {%- macro fh(v) %}{{ v | int if v % 1 == 0 else v | round(1) }}h{%
+          endmacro -%} {%- set periods = [] if cur_cleared else (current.split(';')[2:]
+          | select('ne', '') | list) -%} {%- set ns = namespace(red=0, yellow=0) -%}
+          {%- for period in periods -%}\n  {%- if '-' in period -%}\n    {%- set tp
+          = period.split('-') -%}\n    {%- if tp | length >= 3 -%}\n      {%- set
+          sh = tp[0].split(':')[0] | int -%}\n      {%- set sm = tp[0].split(':')[1]
+          | int -%}\n      {%- set eh = tp[1].split(':')[0] | int -%}\n      {%- set
+          em = tp[1].split(':')[1] | int -%}\n      {%- set s = sh * 60 + sm -%}\n
+          \     {%- set e = eh * 60 + em -%}\n      {%- set e = e + 1440 if e <= s
+          else e -%}\n      {%- set dur = (e - s) / 60 -%}\n      {%- if tp[2] ==
+          '1' -%}{%- set ns.red = ns.red + dur -%}\n      {%- elif tp[2] == '2' -%}{%-
+          set ns.yellow = ns.yellow + dur -%}{%- endif -%}\n    {%- endif -%}\n  {%-
+          endif -%}\n{%- endfor -%} {%- set green = 24 - ns.red - ns.yellow -%} {%-
+          if cur_cleared -%}\n  {%- set row1 = '⚡️ No outages scheduled for ' ~ day
+          -%}\n{%- elif periods | length > 0 -%}\n  {%- set r1_parts = ['⚡️ ' ~ fh(green)]
+          -%}\n  {%- set r1_parts = r1_parts + ['\U0001F534 ' ~ fh(ns.red)] if ns.red
+          > 0 else r1_parts -%}\n  {%- set r1_parts = r1_parts + ['\U0001F7E1 ' ~
+          fh(ns.yellow)] if ns.yellow > 0 else r1_parts -%}\n  {%- set row1 = r1_parts
+          | join(' • ') -%}\n{%- else -%}\n  {%- set row1 = '⚡️ No outages scheduled
+          for ' ~ day -%}\n{%- endif -%} {%- if cur_cleared -%} {%- else -%}\n  {%-
+          set outage_state = states('sensor.power_outage_info') -%}\n  {%- if outage_state
+          not in ['unknown', 'unavailable', 'none', ''] -%}\n    {%- set info = outage_state
+          | from_json -%}\n    {%- set nr = info.get('next_range', 'none') -%}\n    {%-
+          set tu = info.get('time_until_minutes', 0) | int -%}\n    {%- set nd = info.get('next_duration_hours',
+          0) -%}\n    {%- if nr != 'none' -%}\n      {%- set ts = (tu // 60) ~ 'h
+          ' ~ (tu % 60) ~ 'm' if tu >= 60 else (tu % 60) ~ 'm' -%}\n      {%- set
+          row2 = 'Next: ' ~ nr ~ ' (in ' ~ ts ~ ') • ' ~ fh(nd) -%}\n    {%- else
+          -%}\n    {%- endif -%}\n  {%- else -%}\n    {%- set row2 = 'Schedule unavailable'
+          -%}\n  {%- endif -%}\n{%- endif -%} {{- row1 ~ '\\n' ~ row2 -}}"
+      action: notify.notify
+  fields:
+    previous:
+      selector:
+        text:
+      name: previous
+      required: true
+    current:
+      selector:
+        text:
+      name: current
+      required: true
+    day:
+      selector:
+        text:
+      name: day
+      required: true
+  description: ''
+outage_ended:
+  alias: Outage ended
+  sequence:
+  - sequence:
+    - if:
+      - condition: device
+        type: is_on
+        device_id: <DEVICE_POWER_STATION_MAIN>
+        entity_id: <ENTITY_POWER_STATION_MAIN>
+        domain: switch
+      then:
+      - type: turn_off
+        device_id: <DEVICE_POWER_STATION_MAIN>
+        entity_id: <ENTITY_POWER_STATION_MAIN>
+        domain: switch
+      - action: select.select_option
+        metadata: {}
+        data:
+          option: 30 min
+        target:
+          entity_id:
+          - select.river_2_max_unit_timeout
+          - select.river_2_max_ac_timeout
+        enabled: true
+      - type: turn_off
+        device_id: <DEVICE_POWER_STATION_RELAY>
+        entity_id: <ENTITY_POWER_STATION_RELAY>
+        domain: switch
+        enabled: true
+    - if:
+      - condition: state
+        entity_id: switch.miwifi_44_df_65_36_d2_15_wifi_guest
+        state: 'on'
+      then:
+      - delay:
+          hours: 0
+          minutes: 0
+          seconds: 20
+          milliseconds: 0
+      - wait_for_trigger:
+        - trigger: state
+          entity_id:
+          - switch.miwifi_44_df_65_36_d2_15_wifi_guest
+          to: 'off'
+        continue_on_timeout: true
+        timeout:
+          hours: 0
+          minutes: 1
+          seconds: 40
+          milliseconds: 0
+    - data:
+        title: ⚡ Power Restored
+        message: "{%- set outage_state = states('sensor.power_outage_info') -%} {%-
+          if outage_state not in ['unknown', 'unavailable', 'none', ''] -%}\n  {%-
+          set info = outage_state | from_json -%}\n  {%- set nr = info.get('next_range',
+          'none') -%}\n  {%- set tu = info.get('time_until_minutes', 0) | int -%}\n
+          \ {%- set nd = info.get('next_duration_hours', 0) -%}\n  {%- if nr != 'none'
+          -%}\n    {%- set ts = (tu // 60) ~ 'h ' ~ (tu % 60) ~ 'm' if tu >= 60 else
+          (tu % 60) ~ 'm' -%}\n    {%- set row2 = 'Next: ' ~ nr ~ ' (in ' ~ ts ~ ')
+          • ' ~ (nd | int if nd % 1 == 0 else nd | round(1)) ~ 'h' -%}\n  {%- else
+          -%}\n    {%- set row2 = 'No more outages scheduled' -%}\n  {%- endif -%}\n{%-
+          else -%}\n  {%- set row2 = 'Schedule unavailable' -%}\n{%- endif -%} {{-
+          row2 -}}"
+        data:
+          push:
+            sound: default
+            priority: normal
+            vibrate: true
+            importance: high
+            category: light_actions
+      action: notify.notify
+      enabled: false
+    - if: []
+      then: []
+    - if: []
+      then:
+      - action: notify.notify
+        metadata: {}
+        data:
+          title: EcoFlow is not charging
+          target: {}
+          message: Turn on manually or check logs
+    enabled: true
+  description: Implements necessary actions to facilitate the transition from reserve
+    to normal electricity mode
+  icon: mdi:lightbulb-on
+outage_near_to_start:
+  alias: Outage near to start
+  sequence:
+  - sequence:
+    - if:
+      - condition: not
+        conditions:
+        - condition: state
+          entity_id: switch.smart_relay_switch
+          state: unavailable
+      then: []
+    - repeat:
+        sequence:
+        - type: turn_on
+          device_id: <DEVICE_POWER_STATION_RELAY>
+          entity_id: <ENTITY_POWER_STATION_RELAY>
+          domain: switch
+        until:
+        - condition: device
+          type: is_off
+          device_id: <DEVICE_POWER_STATION_MAIN>
+          entity_id: <ENTITY_POWER_STATION_MAIN>
+          domain: switch
+    - type: turn_on
+      device_id: <DEVICE_POWER_STATION_MAIN>
+      entity_id: <ENTITY_POWER_STATION_MAIN>
+      domain: switch
+    - if:
+      - condition: state
+        entity_id: switch.miwifi_44_df_65_36_d2_15_wifi_guest
+        state: 'off'
+      then: []
+      enabled: true
+  description: ''
+  icon: mdi:lightbulb-off-outline

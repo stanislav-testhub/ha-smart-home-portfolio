@@ -1,0 +1,674 @@
+# ==============================================================================
+# 1. HELPERS (Добавить в configuration.yaml или создать через интерфейс HA)
+# ==============================================================================
+
+input_text:
+  vacuum_pending_rooms:
+    name: Vacuum Pending Rooms
+    max: 255
+
+input_boolean:
+  vacuum_delayed_mode:
+    name: Vacuum Delayed Mode
+    icon: mdi:calendar-clock
+# ══════════════════════════════════════════════════════════════════
+# СКРИПТЫ (scripts.yaml) — полная замена
+# ══════════════════════════════════════════════════════════════════
+script:  
+  vacuum_smart_start:  
+    alias: "Vacuum: Smart start — immediate or delayed"  
+    mode: single  
+    fields:  
+      rooms:  
+        description: "Comma-separated room IDs from [[selection_unwrapped]]"  
+        example: "1,2"  
+      repeats:  
+        description: "Number of passes"  
+        default: 1  
+        example: "1"  
+    sequence:  
+
+      # ── STEP 1: build the selects list as a real Python list ──────────────  
+      # This MUST be its own "- variables:" list item, fully closed before  
+      # the next "- choose:" list item begins.  
+      - variables:  
+          selects_list: >-  
+            {% set ns = namespace(result=[]) %}  
+            {% for r in (rooms | string).split(',') %}  
+              {% set ns.result = ns.result + [[r | trim | int, repeats | default(1) | int, 1, 1, 1]] %}  
+            {% endfor %}  
+            {{ ns.result }}  
+
+      # ── STEP 2: choose between delayed and immediate mode ─────────────────  
+      # This is a SEPARATE list item — note the leading "- choose:" dash  
+      - choose:  
+
+          # ── DELAYED MODE ──────────────────────────────────────────────────  
+          - conditions:  
+              - condition: state  
+                entity_id: input_boolean.vacuum_delayed_mode  
+                state: "on"  
+            sequence:  
+              - action: input_text.set_value  
+                target:  
+                  entity_id: input_text.vacuum_pending_rooms  
+                data:  
+                  value: "{{ rooms | string | trim }}"  
+              - action: persistent_notification.create  
+                data:  
+                  notification_id: vacuum_schedule  
+                  title: "🤖 Уборка запланирована"  
+                  message: >-  
+                    {% set room_names = {  
+                      '1': 'Bedroom',  
+                      '2': 'Hall',  
+                      '3': 'Second room',  
+                      '5': 'Kitchen'  
+                    } %}  
+                    {% set selected_ids = (rooms | string).split(',') %}  
+                    {% set ns = namespace(names=[]) %}  
+                    {% for r_id in selected_ids %}  
+                      {% set ns.names = ns.names + [room_names.get(r_id | trim, 'Неизвестная зона ' ~ r_id)] %}  
+                    {% endfor %}  
+                    Комнаты: {{ ns.names | join(', ') }} — будут убраны, как только вы уйдёте. Нажмите 🏠↩ для отмены.  
+
+        # ── IMMEDIATE MODE (default) ──────────────────────────────────────  
+        default:  
+          - action: xiaomi_miot.call_action  
+            data:  
+              entity_id: vacuum.dreame_mb1808_a399_robot_cleaner  
+              siid: 18  
+              aiid: 1  
+              params:  
+                - piid: 1  
+                  value: 18  
+                - piid: 21  
+                  value: "{{ {'selects': selects_list} | tojson }}"  
+              force_params: true  
+
+  vacuum_cancel_schedule:
+    alias: "Vacuum: Cancel scheduled cleaning"
+    description: "Отменяет отложенную уборку и очищает запомненные комнаты."
+    mode: single
+    sequence:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.vacuum_pending_rooms
+        data:
+          value: ""
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.vacuum_delayed_mode
+      - action: persistent_notification.dismiss
+        data:
+          notification_id: vacuum_schedule
+
+# =====================================================================
+# АВТОМАТИЗАЦИЯ (automations.yaml) — запуск при уходе из дома
+# =====================================================================
+automation:  
+  - id: vacuum_clean_pending_when_owner_away  
+    alias: "Vacuum: Start pending rooms when Owner leaves"  
+    mode: single  
+    triggers:  
+      - id: owner_left_home  
+        trigger: state  
+        entity_id: device_tracker.9e96e24d9d12_openwrt  
+        from: "home"  
+        to: "not_home"  
+        for:  
+          minutes: 0  
+    conditions:  
+      - condition: state  
+        entity_id: input_boolean.vacuum_delayed_mode  
+        state: "on"  
+      - condition: template  
+        value_template: "{{ states('input_text.vacuum_pending_rooms') | length > 0 }}"  
+      - condition: time  
+        after: "07:00:00"  
+        before: "22:00:00"  
+      - condition: not  
+        conditions:  
+          - condition: state  
+            entity_id: vacuum.dreame_mb1808_a399_robot_cleaner  
+            state: "cleaning"  
+    actions:  
+
+      # ── STEP 1: Capture saved_rooms BEFORE we touch input_text ────────────  
+      - variables:  
+          saved_rooms: "{{ states('input_text.vacuum_pending_rooms') | string | trim }}"  
+
+      # ── STEP 2: Build the selects list from saved IDs ─────────────────────  
+      - variables:  
+          selects_list: >-  
+            {% set ns = namespace(result=[]) %}  
+            {% for r in saved_rooms.split(',') %}  
+              {% set ns.result = ns.result + [[r | trim | int, 1, 1, 1, 1]] %}  
+            {% endfor %}  
+            {{ ns.result }}  
+
+      # ── STEP 3: Send command to vacuum ────────────────────────────────────  
+      - action: xiaomi_miot.call_action  
+        data:  
+          entity_id: vacuum.dreame_mb1808_a399_robot_cleaner  
+          siid: 18  
+          aiid: 1  
+          params:  
+            - piid: 1  
+              value: 18  
+            - piid: 21  
+              value: "{{ {'selects': selects_list} | tojson }}"  
+          force_params: true  
+
+      # ── STEP 4: Clean up helpers ──────────────────────────────────────────  
+      - action: input_text.set_value  
+        target:  
+          entity_id: input_text.vacuum_pending_rooms  
+        data:  
+          value: ""  
+      - action: input_boolean.turn_off  
+        target:  
+          entity_id: input_boolean.vacuum_delayed_mode  
+      - action: persistent_notification.dismiss  
+        data:  
+          notification_id: vacuum_schedule  
+
+      # ── STEP 5: Success notification (uses saved_rooms from STEP 1) ───────  
+      - action: persistent_notification.create  
+        data:  
+          notification_id: vacuum_started  
+          title: "🤖 Уборка запущена"  
+          message: >-  
+            {% set room_names = {'1':'Bedroom','2':'Hall','3':'Second room','5':'Kitchen'} %}  
+            {% set ns = namespace(names=[]) %}  
+            {% for r_id in saved_rooms.split(',') %}  
+              {% set ns.names = ns.names + [room_names.get(r_id | trim, 'Зона ' ~ (r_id | trim))] %}  
+            {% endfor %}  
+            Пылесос начал уборку: {{ ns.names | join(', ') }}
+            
+            
+            
+            
+# type: custom:xiaomi-vacuum-map-card
+# title: Xiaomi Vacuum Map Card
+# preset_name: Live map
+# entity: vacuum.dreame_mb1808_a399_robot_cleaner
+# map_source:
+#   camera: camera.mi_robot_vacuum_mop_live_map
+# calibration_source:
+#   camera: true
+# vacuum_platform: al-one/hass-xiaomi-miot
+# map_modes:
+#   - name: Rooms
+#     icon: mdi:floor-plan
+#     run_immediately: false
+#     coordinates_rounding: true
+#     coordinates_to_meters_divider: 1000
+#     selection_type: ROOM
+#     id_type: number
+#     max_selections: 4
+#     repeats_type: EXTERNAL
+#     max_repeats: 3
+#     service_call_schema:
+#       evaluate_data_as_template: true
+#       service: xiaomi_miot.call_action
+#       service_data:
+#         entity_id: "[[entity_id]]"
+#         siid: 18
+#         aiid: 1
+#         params:
+#           - piid: 1
+#             value: 18
+#           - piid: 21
+#             value: >-
+#               {% set selected = '[[selection_unwrapped]]'.split(',') %}
+#               {"selects":[{% for item in selected
+#               %}[{{item|int}},[[repeats]],1,1,1]{% if not loop.last %},{% endif
+#               %}{% endfor %}]}
+#         force_params: true
+#     predefined_selections:
+#       - id: 1
+#         label:
+#           text: Bedroom
+#           x: -1500
+#           "y": 1400
+#           offset_y: 35
+#         icon:
+#           name: mdi:bed
+#           x: -1500
+#           "y": 1400
+#       - id: 2
+#         label:
+#           text: Hall
+#           x: -200
+#           "y": -2500
+#           offset_y: 35
+#         icon:
+#           name: mdi:door
+#           x: -200
+#           "y": -2500
+#       - id: 3
+#         label:
+#           text: Second room
+#           x: -2987
+#           "y": -2177
+#           offset_y: 35
+#         icon:
+#           name: mdi:bed-double
+#           x: -2987
+#           "y": -2177
+#       - id: 5
+#         label:
+#           text: Kitchen
+#           x: -3576
+#           "y": -5165
+#           offset_y: 35
+#         icon:
+#           name: mdi:pot-mix
+#           x: -3576
+#           "y": -5165
+#     variables: {}
+#   - name: Zone cleanup
+#     icon: mdi:select-drag
+#     run_immediately: false
+#     coordinates_rounding: true
+#     coordinates_to_meters_divider: 1000
+#     selection_type: MANUAL_RECTANGLE
+#     max_selections: 5
+#     repeats_type: EXTERNAL
+#     max_repeats: 3
+#     service_call_schema:
+#       service: xiaomi_miot.call_action
+#       service_data:
+#         entity_id: "[[entity_id]]"
+#         siid: 18
+#         aiid: 1
+#         params:
+#           - piid: 1
+#             value: 19
+#           - piid: 21
+#             value: "{\"areas\":[[[[selection_unwrapped]],[[repeats]],1,1]]}"
+#         force_params: true
+#     predefined_selections: []
+#     variables: {}
+# tiles:
+#   - tile_id: battery_level
+#     entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#     label: Battery
+#     attribute: battery_level
+#     icon_source: vacuum.dreame_mb1808_a399_robot_cleaner.attributes.battery_icon
+#     unit: "%"
+#   - tile_id: fan_speed
+#     entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#     label: Fan speed
+#     attribute: fan_speed
+#     icon: mdi:fan
+#     translations:
+#       安静: Silent
+#       标准: Standard
+#       中档: Strong
+#       强力: Turbo
+# icons:
+#   - icon: mdi:play
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: cleaning
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: error
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: returning
+#     tooltip: Start
+#     tap_action:
+#       action: call-service
+#       service: vacuum.start
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#   - icon: mdi:stop
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: docked
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: idle
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: error
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: paused
+#     tooltip: Stop
+#     tap_action:
+#       action: call-service
+#       service: vacuum.stop
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#   - icon: mdi:home-map-marker
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: returning
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: docked
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: idle
+#     tooltip: Return to base
+#     tap_action:
+#       action: call-service
+#       service: vacuum.return_to_base
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#   - icon: mdi:map-marker
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: returning
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: docked
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: idle
+#     tooltip: Locate
+#     tap_action:
+#       action: call-service
+#       service: vacuum.locate
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#   - menu_id: fan_speed
+#     icon: mdi:fan-speed-1
+#     label: Silent
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         attribute: fan_speed
+#         value: Silent
+#     tooltip: Set Silent
+#     tap_action:
+#       action: call-service
+#       service: vacuum.set_fan_speed
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#       service_data:
+#         fan_speed: 安静
+#   - menu_id: fan_speed
+#     icon: mdi:fan-speed-2
+#     label: Standard
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         attribute: fan_speed
+#         value: Standard
+#     tooltip: Set Standard
+#     tap_action:
+#       action: call-service
+#       service: vacuum.set_fan_speed
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#       service_data:
+#         fan_speed: 标准
+#   - menu_id: fan_speed
+#     icon: mdi:fan-speed-3
+#     label: Strong
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         attribute: fan_speed
+#         value: Strong
+#     tooltip: Set Strong
+#     tap_action:
+#       action: call-service
+#       service: vacuum.set_fan_speed
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#       service_data:
+#         fan_speed: 中档
+#   - menu_id: fan_speed
+#     icon: mdi:fan-plus
+#     label: Turbo
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         attribute: fan_speed
+#         value: Turbo
+#     tooltip: Set Turbo
+#     tap_action:
+#       action: call-service
+#       service: vacuum.set_fan_speed
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#       service_data:
+#         fan_speed: 强力
+# two_finger_pan: true
+# map_locked: true
+
+
+# type: custom:xiaomi-vacuum-map-card
+# title: Xiaomi Vacuum Map Card
+# preset_name: Live map
+# entity: vacuum.dreame_mb1808_a399_robot_cleaner
+# map_source:
+#   camera: camera.mi_robot_vacuum_mop_live_map
+# calibration_source:
+#   camera: true
+# vacuum_platform: al-one/hass-xiaomi-miot
+# map_modes:
+#   - name: Rooms
+#     icon: mdi:floor-plan
+#     run_immediately: false
+#     coordinates_rounding: true
+#     coordinates_to_meters_divider: 1000
+#     selection_type: ROOM
+#     id_type: number
+#     max_selections: 4
+#     repeats_type: EXTERNAL
+#     max_repeats: 3
+#     service_call_schema:
+#       evaluate_data_as_template: false
+#       service: script.vacuum_smart_start
+#       service_data:
+#         rooms: "[[selection_unwrapped]]"
+#         repeats: "[[repeats]]"
+#     predefined_selections:
+#       - id: 1
+#         label:
+#           text: Bedroom
+#           x: -1500
+#           "y": 1400
+#           offset_y: 35
+#         icon:
+#           name: mdi:bed
+#           x: -1500
+#           "y": 1400
+#       - id: 2
+#         label:
+#           text: Hall
+#           x: -200
+#           "y": -2500
+#           offset_y: 35
+#         icon:
+#           name: mdi:door
+#           x: -200
+#           "y": -2500
+#       - id: 3
+#         label:
+#           text: Second room
+#           x: -2987
+#           "y": -2177
+#           offset_y: 35
+#         icon:
+#           name: mdi:bed-double
+#           x: -2987
+#           "y": -2177
+#       - id: 5
+#         label:
+#           text: Kitchen
+#           x: -3576
+#           "y": -5165
+#           offset_y: 35
+#         icon:
+#           name: mdi:pot-mix
+#           x: -3576
+#           "y": -5165
+#   - name: Zone cleanup
+#     icon: mdi:select-drag
+#     run_immediately: false
+#     coordinates_rounding: true
+#     coordinates_to_meters_divider: 1000
+#     selection_type: MANUAL_RECTANGLE
+#     max_selections: 5
+#     repeats_type: EXTERNAL
+#     max_repeats: 3
+#     service_call_schema:
+#       service: xiaomi_miot.call_action
+#       service_data:
+#         entity_id: "[[entity_id]]"
+#         siid: 18
+#         aiid: 1
+#         params:
+#           - piid: 1
+#             value: 19
+#           - piid: 21
+#             value: "{\"areas\":[[[[selection_unwrapped]],[[repeats]],1,1]]}"
+#         force_params: true
+#     predefined_selections: []
+# tiles:
+#   - tile_id: battery_level
+#     entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#     label: Battery
+#     attribute: battery_level
+#     icon_source: vacuum.dreame_mb1808_a399_robot_cleaner.attributes.battery_icon
+#     unit: "%"
+#   - tile_id: delayed_mode_status
+#     entity: input_boolean.vacuum_delayed_mode
+#     label: Delayed cleanup
+#     icon: mdi:calendar-clock
+# icons:
+#   - icon: mdi:home-export-outline
+#     icon_id: delayed_mode_off
+#     tooltip: Cleanup when away
+#     conditions:
+#       - entity: input_boolean.vacuum_delayed_mode
+#         value: "off"
+#     tap_action:
+#       action: call-service
+#       service: input_boolean.turn_on
+#       target:
+#         entity_id: input_boolean.vacuum_delayed_mode
+#   - icon: mdi:home-clock
+#     icon_id: delayed_mode_on
+#     tooltip: Cancel "cleanup when away"
+#     conditions:
+#       - entity: input_boolean.vacuum_delayed_mode
+#         value: "on"
+#     tap_action:
+#       action: call-service
+#       service: script.vacuum_cancel_schedule
+#   - icon: mdi:play
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: cleaning
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: error
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: returning
+#     tooltip: Start
+#     tap_action:
+#       action: call-service
+#       service: vacuum.start
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#   - icon: mdi:stop
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: docked
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: idle
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: error
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: paused
+#     tooltip: Stop
+#     tap_action:
+#       action: call-service
+#       service: vacuum.stop
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#   - icon: mdi:home-map-marker
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: returning
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: docked
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: idle
+#     tooltip: Return to base
+#     tap_action:
+#       action: call-service
+#       service: vacuum.return_to_base
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#   - icon: mdi:map-marker
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: returning
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: docked
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         value_not: idle
+#     tooltip: Locate
+#     tap_action:
+#       action: call-service
+#       service: vacuum.locate
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#   - menu_id: fan_speed
+#     icon: mdi:fan-speed-1
+#     label: Silent
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         attribute: fan_speed
+#         value: Silent
+#     tooltip: Set Silent
+#     tap_action:
+#       action: call-service
+#       service: vacuum.set_fan_speed
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#       service_data:
+#         fan_speed: 安静
+#   - menu_id: fan_speed
+#     icon: mdi:fan-speed-2
+#     label: Standard
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         attribute: fan_speed
+#         value: Standard
+#     tooltip: Set Standard
+#     tap_action:
+#       action: call-service
+#       service: vacuum.set_fan_speed
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#       service_data:
+#         fan_speed: 标准
+#   - menu_id: fan_speed
+#     icon: mdi:fan-speed-3
+#     label: Strong
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         attribute: fan_speed
+#         value: Strong
+#     tooltip: Set Strong
+#     tap_action:
+#       action: call-service
+#       service: vacuum.set_fan_speed
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#       service_data:
+#         fan_speed: 中档
+#   - menu_id: fan_speed
+#     icon: mdi:fan-plus
+#     label: Turbo
+#     conditions:
+#       - entity: vacuum.dreame_mb1808_a399_robot_cleaner
+#         attribute: fan_speed
+#         value: Turbo
+#     tooltip: Set Turbo
+#     tap_action:
+#       action: call-service
+#       service: vacuum.set_fan_speed
+#       target:
+#         entity_id: vacuum.dreame_mb1808_a399_robot_cleaner
+#       service_data:
+#         fan_speed: 强力
+# two_finger_pan: true
+# map_locked: true

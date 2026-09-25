@@ -1,0 +1,1024 @@
+mqtt:
+  sensor:
+    # ========== Router health ==========
+    - name: "OpenWrt Temperature"
+      unique_id: openwrt_temperature_c
+      state_topic: "collectd/OpenWrt/thermal-thermal_zone0/temperature"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+      expire_after: 180
+      device: &openwrt_device
+        identifiers: ["openwrt_24_10_router"]
+        name: "OpenWRT"
+        manufacturer: "OpenWrt"
+        model: "Router"
+        sw_version: "24.10+"
+
+    - name: "OpenWrt Load 1m"
+      unique_id: openwrt_load_1m
+      state_topic: "collectd/OpenWrt/load/load"
+      value_template: "{{ value.split(':')[1] | float(0) | round(3) }}"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt Load 5m"
+      unique_id: openwrt_load_5m
+      state_topic: "collectd/OpenWrt/load/load"
+      value_template: "{{ value.split(':')[2] | float(0) | round(3) }}"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt Load 15m"
+      unique_id: openwrt_load_15m
+      state_topic: "collectd/OpenWrt/load/load"
+      value_template: "{{ value.split(':')[3].split('\x00')[0] | float(0) | round(3) }}"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt CPU User"
+      unique_id: openwrt_cpu_user_pct
+      state_topic: "collectd/OpenWrt/cpu/percent-user"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(3) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt CPU System"
+      unique_id: openwrt_cpu_system_pct
+      state_topic: "collectd/OpenWrt/cpu/percent-system"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(3) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt CPU Idle"
+      unique_id: openwrt_cpu_idle_pct
+      state_topic: "collectd/OpenWrt/cpu/percent-idle"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt CPU Interrupt"
+      unique_id: openwrt_cpu_interrupt_pct
+      state_topic: "collectd/OpenWrt/cpu/percent-interrupt"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(3) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt CPU SoftIRQ"
+      unique_id: openwrt_cpu_softirq_pct
+      state_topic: "collectd/OpenWrt/cpu/percent-softirq"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(3) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt Memory Used"
+      unique_id: openwrt_mem_used_mib
+      state_topic: "collectd/OpenWrt/memory/memory-used"
+      value_template: "{{ (value.split(':')[1].split('\x00')[0] | float(0) / 1048576) | round(1) }}"
+      unit_of_measurement: "MiB"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt Memory Free"
+      unique_id: openwrt_mem_free_mib
+      state_topic: "collectd/OpenWrt/memory/memory-free"
+      value_template: "{{ (value.split(':')[1].split('\x00')[0] | float(0) / 1048576) | round(1) }}"
+      unit_of_measurement: "MiB"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt Memory Cached"
+      unique_id: openwrt_mem_cached_mib
+      state_topic: "collectd/OpenWrt/memory/memory-cached"
+      value_template: "{{ (value.split(':')[1].split('\x00')[0] | float(0) / 1048576) | round(1) }}"
+      unit_of_measurement: "MiB"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt Memory Buffered"
+      unique_id: openwrt_mem_buffered_mib
+      state_topic: "collectd/OpenWrt/memory/memory-buffered"
+      value_template: "{{ (value.split(':')[1].split('\x00')[0] | float(0) / 1048576) | round(1) }}"
+      unit_of_measurement: "MiB"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt Memory Used Percent"
+      unique_id: openwrt_mem_used_pct
+      state_topic: "collectd/OpenWrt/memory/percent-used"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt Context Switches"
+      unique_id: openwrt_context_switches
+      state_topic: "collectd/OpenWrt/contextswitch/contextswitch"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(1) }}"
+      unit_of_measurement: "/s"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt Conntrack Used"
+      unique_id: openwrt_conntrack_used
+      state_topic: "collectd/OpenWrt/conntrack/conntrack"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt Conntrack Max"
+      unique_id: openwrt_conntrack_max
+      state_topic: "collectd/OpenWrt/conntrack/conntrack-max"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      state_class: measurement
+      expire_after: 600
+      device: *openwrt_device
+
+    - name: "OpenWrt Conntrack Utilization"
+      unique_id: openwrt_conntrack_util_pct
+      state_topic: "collectd/OpenWrt/conntrack/percent-used"
+      value_template: "{{ (value.split(':')[1].split('\x00')[0] | float(0) * 100) | round(3) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    # ========== WAN (br-WAN / eth1) ==========
+    - name: "OpenWrt br-WAN (eth1) RX"
+      unique_id: openwrt_br_wan_rx_mbps
+      state_topic: "collectd/OpenWrt/interface-br-WAN/if_octets"
+      value_template: "{{ ((value.split(':')[1] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt br-WAN (eth1) TX"
+      unique_id: openwrt_br_wan_tx_mbps
+      state_topic: "collectd/OpenWrt/interface-br-WAN/if_octets"
+      value_template: "{{ ((value.split(':')[2].split('\x00')[0] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt br-WAN (eth1) RX Packets"
+      unique_id: openwrt_br_wan_rx_pps
+      state_topic: "collectd/OpenWrt/interface-br-WAN/if_packets"
+      value_template: "{{ value.split(':')[1] | float(0) | round(2) }}"
+      unit_of_measurement: "pkt/s"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt br-WAN (eth1) TX Packets"
+      unique_id: openwrt_br_wan_tx_pps
+      state_topic: "collectd/OpenWrt/interface-br-WAN/if_packets"
+      value_template: "{{ value.split(':')[2].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "pkt/s"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt br-WAN (eth1) Errors"
+      unique_id: openwrt_br_wan_errors
+      state_topic: "collectd/OpenWrt/interface-br-WAN/if_errors"
+      value_template: >-
+        {% set parts = value.split(':') %}
+        {% if parts|length >= 3 %}
+        {% set rx = parts[1]|float(0) %}
+        {% set tx = parts[2].split('\x00')[0]|float(0) %}
+        {{ (rx + tx)|round(0)|int }}
+        {% else %}
+        {{ 0 }}
+        {% endif %}
+      unit_of_measurement: "pkt/s"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt br-WAN (eth1) Dropped"
+      unique_id: openwrt_br_wan_dropped
+      state_topic: "collectd/OpenWrt/interface-br-WAN/if_dropped"
+      value_template: >-
+        {% set parts = value.split(':') %}
+        {% if parts|length >= 3 %}
+        {% set rx = parts[1]|float(0) %}
+        {% set tx = parts[2].split('\x00')[0]|float(0) %}
+        {{ (rx + tx)|round(0)|int }}
+        {% else %}
+        {{ 0 }}
+        {% endif %}
+      unit_of_measurement: "pkt/s"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt eth1 RX"
+      unique_id: openwrt_eth1_rx_mbps
+      state_topic: "collectd/OpenWrt/interface-eth1/if_octets"
+      value_template: "{{ ((value.split(':')[1] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt eth1 TX"
+      unique_id: openwrt_eth1_tx_mbps
+      state_topic: "collectd/OpenWrt/interface-eth1/if_octets"
+      value_template: "{{ ((value.split(':')[2].split('\x00')[0] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    # ========== LAN / Guest ==========
+    - name: "OpenWrt br-lan RX"
+      unique_id: openwrt_br_lan_rx_mbps
+      state_topic: "collectd/OpenWrt/interface-br-lan/if_octets"
+      value_template: "{{ ((value.split(':')[1] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt br-lan TX"
+      unique_id: openwrt_br_lan_tx_mbps
+      state_topic: "collectd/OpenWrt/interface-br-lan/if_octets"
+      value_template: "{{ ((value.split(':')[2].split('\x00')[0] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt br-guest RX"
+      unique_id: openwrt_br_guest_rx_mbps
+      state_topic: "collectd/OpenWrt/interface-br-guest/if_octets"
+      value_template: "{{ ((value.split(':')[1] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt br-guest TX"
+      unique_id: openwrt_br_guest_tx_mbps
+      state_topic: "collectd/OpenWrt/interface-br-guest/if_octets"
+      value_template: "{{ ((value.split(':')[2].split('\x00')[0] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    # ========== Wi‑Fi Interfaces (data throughput) ==========
+    - name: "OpenWrt phy0-ap0 (TP-Link_77) RX"
+      unique_id: openwrt_phy0_ap0_rx_mbps
+      state_topic: "collectd/OpenWrt/interface-phy0-ap0/if_octets"
+      value_template: "{{ ((value.split(':')[1] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt phy0-ap0 (TP-Link_77) TX"
+      unique_id: openwrt_phy0_ap0_tx_mbps
+      state_topic: "collectd/OpenWrt/interface-phy0-ap0/if_octets"
+      value_template: "{{ ((value.split(':')[2].split('\x00')[0] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt phy0-ap1 (iot_network) RX"
+      unique_id: openwrt_phy0_ap1_rx_mbps
+      state_topic: "collectd/OpenWrt/interface-phy0-ap1/if_octets"
+      value_template: "{{ ((value.split(':')[1] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt phy0-ap1 (iot_network) TX"
+      unique_id: openwrt_phy0_ap1_tx_mbps
+      state_topic: "collectd/OpenWrt/interface-phy0-ap1/if_octets"
+      value_template: "{{ ((value.split(':')[2].split('\x00')[0] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt phy1-ap0 (TP-Link_3B95_5G) RX"
+      unique_id: openwrt_phy1_ap0_rx_mbps
+      state_topic: "collectd/OpenWrt/interface-phy1-ap0/if_octets"
+      value_template: "{{ ((value.split(':')[1] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "OpenWrt phy1-ap0 (TP-Link_3B95_5G) TX"
+      unique_id: openwrt_phy1_ap0_tx_mbps
+      state_topic: "collectd/OpenWrt/interface-phy1-ap0/if_octets"
+      value_template: "{{ ((value.split(':')[2].split('\x00')[0] | float(0)) * 8 / 1000000) | round(4) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    # ========== Wi‑Fi (iwinfo) – signal quality & stations ==========
+    - name: "WiFi TP-Link_77 (phy0-ap0) Stations"
+      unique_id: openwrt_wifi_tplink_77_stations
+      state_topic: "collectd/OpenWrt/iwinfo-phy0-ap0/stations"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi TP-Link_77 (phy0-ap0) Signal"
+      unique_id: openwrt_wifi_tplink_77_signal_dbm
+      state_topic: "collectd/OpenWrt/iwinfo-phy0-ap0/signal_power"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      unit_of_measurement: "dBm"
+      device_class: signal_strength
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi TP-Link_77 (phy0-ap0) Noise"
+      unique_id: openwrt_wifi_tplink_77_noise_dbm
+      state_topic: "collectd/OpenWrt/iwinfo-phy0-ap0/signal_noise"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      unit_of_measurement: "dBm"
+      device_class: signal_strength
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi TP-Link_77 (phy0-ap0) Quality"
+      unique_id: openwrt_wifi_tplink_77_quality_pct
+      state_topic: "collectd/OpenWrt/iwinfo-phy0-ap0/signal_quality"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi TP-Link_77 (phy0-ap0) Bitrate"
+      unique_id: openwrt_wifi_tplink_77_bitrate_mbps
+      state_topic: "collectd/OpenWrt/iwinfo-phy0-ap0/bitrate"
+      value_template: "{{ ((value.split(':')[1].split('\x00')[0] | float(0)) / 1000000) | round(1) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi iot_network (phy0-ap1) Stations"
+      unique_id: openwrt_wifi_iot_stations
+      state_topic: "collectd/OpenWrt/iwinfo-phy0-ap1/stations"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi iot_network (phy0-ap1) Signal"
+      unique_id: openwrt_wifi_iot_signal_dbm
+      state_topic: "collectd/OpenWrt/iwinfo-phy0-ap1/signal_power"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      unit_of_measurement: "dBm"
+      device_class: signal_strength
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi iot_network (phy0-ap1) Quality"
+      unique_id: openwrt_wifi_iot_quality_pct
+      state_topic: "collectd/OpenWrt/iwinfo-phy0-ap1/signal_quality"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi iot_network (phy0-ap1) Bitrate"
+      unique_id: openwrt_wifi_iot_bitrate_mbps
+      state_topic: "collectd/OpenWrt/iwinfo-phy0-ap1/bitrate"
+      value_template: "{{ ((value.split(':')[1].split('\x00')[0] | float(0)) / 1000000) | round(1) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi Guest_WiFi_77_5G_Stable (phy0-ap2) Stations"
+      unique_id: openwrt_wifi_guest_stable_stations
+      state_topic: "collectd/OpenWrt/iwinfo-phy0-ap2/stations"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi TP-Link_3B95_5G (phy1-ap0) Stations"
+      unique_id: openwrt_wifi_tplink_3b95_5g_stations
+      state_topic: "collectd/OpenWrt/iwinfo-phy1-ap0/stations"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi TP-Link_3B95_5G (phy1-ap0) Signal"
+      unique_id: openwrt_wifi_tplink_3b95_5g_signal_dbm
+      state_topic: "collectd/OpenWrt/iwinfo-phy1-ap0/signal_power"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      unit_of_measurement: "dBm"
+      device_class: signal_strength
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi TP-Link_3B95_5G (phy1-ap0) Quality"
+      unique_id: openwrt_wifi_tplink_3b95_5g_quality_pct
+      state_topic: "collectd/OpenWrt/iwinfo-phy1-ap0/signal_quality"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi TP-Link_3B95_5G (phy1-ap0) Bitrate"
+      unique_id: openwrt_wifi_tplink_3b95_5g_bitrate_mbps
+      state_topic: "collectd/OpenWrt/iwinfo-phy1-ap0/bitrate"
+      value_template: "{{ ((value.split(':')[1].split('\x00')[0] | float(0)) / 1000000) | round(1) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "WiFi Guest_WiFi_77_5G_Secure_&_Fast (phy1-ap1) Stations"
+      unique_id: openwrt_wifi_guest_fast_stations
+      state_topic: "collectd/OpenWrt/iwinfo-phy1-ap1/stations"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      state_class: measurement
+      expire_after: 180
+      device: *openwrt_device
+
+    - name: "Starlink reserve (phy1-sta0) Signal"
+      unique_id: openwrt_starlink_signal_dbm
+      state_topic: "collectd/OpenWrt/iwinfo-phy1-sta0/signal_power"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      unit_of_measurement: "dBm"
+      device_class: signal_strength
+      state_class: measurement
+      expire_after: 3600
+      device: *openwrt_device
+
+    - name: "Starlink reserve (phy1-sta0) Stations"
+      unique_id: openwrt_starlink_stations
+      state_topic: "collectd/OpenWrt/iwinfo-phy1-sta0/stations"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      state_class: measurement
+      expire_after: 3600
+      device: *openwrt_device
+
+    # ========== Speedtest ==========
+    - name: "OpenWrt Speedtest Latency"
+      unique_id: openwrt_speedtest_latency_ms
+      state_topic: "collectd/OpenWrt/exec-speedtest/latency"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "ms"
+      state_class: measurement
+      expire_after: 7200
+      device: *openwrt_device
+
+    - name: "OpenWrt Speedtest Download"
+      unique_id: openwrt_speedtest_down_mbps
+      state_topic: "collectd/OpenWrt/exec-speedtest/bitrate-download"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 7200
+      device: *openwrt_device
+
+    - name: "OpenWrt Speedtest Upload"
+      unique_id: openwrt_speedtest_up_mbps
+      state_topic: "collectd/OpenWrt/exec-speedtest/bitrate-upload"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 7200
+      device: *openwrt_device
+
+    # ========== USB Storage (df-mnt-usb_storage) ==========
+    - name: "USB Storage Used"
+      unique_id: openwrt_usb_storage_used_gib
+      state_topic: "collectd/OpenWrt/df-mnt-usb_storage/df_complex-used"
+      value_template: "{{ (value.split(':')[1].split('\x00')[0] | float(0) / 1073741824) | round(2) }}"
+      unit_of_measurement: "GiB"
+      device_class: data_size
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "USB Storage Free"
+      unique_id: openwrt_usb_storage_free_gib
+      state_topic: "collectd/OpenWrt/df-mnt-usb_storage/df_complex-free"
+      value_template: "{{ (value.split(':')[1].split('\x00')[0] | float(0) / 1073741824) | round(2) }}"
+      unit_of_measurement: "GiB"
+      device_class: data_size
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "USB Storage Reserved"
+      unique_id: openwrt_usb_storage_reserved_gib
+      state_topic: "collectd/OpenWrt/df-mnt-usb_storage/df_complex-reserved"
+      value_template: "{{ (value.split(':')[1].split('\x00')[0] | float(0) / 1073741824) | round(2) }}"
+      unit_of_measurement: "GiB"
+      device_class: data_size
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "USB Storage Free Percent"
+      unique_id: openwrt_usb_storage_free_pct
+      state_topic: "collectd/OpenWrt/df-mnt-usb_storage/percent_bytes-free"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "USB Storage Used Percent"
+      unique_id: openwrt_usb_storage_used_pct
+      state_topic: "collectd/OpenWrt/df-mnt-usb_storage/percent_bytes-used"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "%"
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    # ========== Disk sda1 I/O Metrics ==========
+    - name: "Disk sda1 Read Ops"
+      unique_id: openwrt_disk_sda1_read_ops
+      state_topic: "collectd/OpenWrt/disk-sda1/disk_ops"
+      value_template: "{{ value.split(':')[1] | float(0) | round(2) }}"
+      unit_of_measurement: "ops/s"
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "Disk sda1 Write Ops"
+      unique_id: openwrt_disk_sda1_write_ops
+      state_topic: "collectd/OpenWrt/disk-sda1/disk_ops"
+      value_template: "{{ value.split(':')[2].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "ops/s"
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "Disk sda1 Read Throughput"
+      unique_id: openwrt_disk_sda1_read_throughput
+      state_topic: "collectd/OpenWrt/disk-sda1/disk_octets"
+      value_template: "{{ (value.split(':')[1] | float(0) / 1048576) | round(3) }}"
+      unit_of_measurement: "MB/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "Disk sda1 Write Throughput"
+      unique_id: openwrt_disk_sda1_write_throughput
+      state_topic: "collectd/OpenWrt/disk-sda1/disk_octets"
+      value_template: "{{ (value.split(':')[2].split('\x00')[0] | float(0) / 1048576) | round(3) }}"
+      unit_of_measurement: "MB/s"
+      device_class: data_rate
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "Disk sda1 Read Time"
+      unique_id: openwrt_disk_sda1_read_time_ms
+      state_topic: "collectd/OpenWrt/disk-sda1/disk_time"
+      value_template: "{{ value.split(':')[1] | float(0) | round(2) }}"
+      unit_of_measurement: "ms"
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "Disk sda1 Write Time"
+      unique_id: openwrt_disk_sda1_write_time_ms
+      state_topic: "collectd/OpenWrt/disk-sda1/disk_time"
+      value_template: "{{ value.split(':')[2].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "ms"
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "Disk sda1 IO Time"
+      unique_id: openwrt_disk_sda1_io_time_ms
+      state_topic: "collectd/OpenWrt/disk-sda1/disk_io_time"
+      value_template: "{{ value.split(':')[2].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "ms"
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "Disk sda1 Pending Operations"
+      unique_id: openwrt_disk_sda1_pending_ops
+      state_topic: "collectd/OpenWrt/disk-sda1/pending_operations"
+      value_template: "{{ value.split(':')[1].split('\x00')[0] | int(0) }}"
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "Disk sda1 Read Merged"
+      unique_id: openwrt_disk_sda1_read_merged
+      state_topic: "collectd/OpenWrt/disk-sda1/disk_merged"
+      value_template: "{{ value.split(':')[1] | float(0) | round(2) }}"
+      unit_of_measurement: "ops/s"
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+    - name: "Disk sda1 Write Merged"
+      unique_id: openwrt_disk_sda1_write_merged
+      state_topic: "collectd/OpenWrt/disk-sda1/disk_merged"
+      value_template: "{{ value.split(':')[2].split('\x00')[0] | float(0) | round(2) }}"
+      unit_of_measurement: "ops/s"
+      state_class: measurement
+      expire_after: 300
+      device: *openwrt_device
+
+template:
+  sensor:
+    # MB/s variants
+    - name: "OpenWrt br-WAN (eth1) RX (MB/s)"
+      unique_id: openwrt_br_wan_rx_mbytes_s
+      state: "{{ (states('sensor.openwrt_br_wan_eth1_rx') | float(0) / 8) | round(5) }}"
+      unit_of_measurement: "MB/s"
+      state_class: measurement
+      availability: "{{ states('sensor.openwrt_br_wan_eth1_rx') not in ['unknown', 'unavailable'] }}"
+
+    - name: "OpenWrt br-WAN (eth1) TX (MB/s)"
+      unique_id: openwrt_br_wan_tx_mbytes_s
+      state: "{{ (states('sensor.openwrt_br_wan_eth1_tx') | float(0) / 8) | round(5) }}"
+      unit_of_measurement: "MB/s"
+      state_class: measurement
+      availability: "{{ states('sensor.openwrt_br_wan_eth1_tx') not in ['unknown', 'unavailable'] }}"
+
+    # Combined WAN total throughput
+    - name: "OpenWrt WAN Total (br-WAN) (Mbit/s)"
+      unique_id: openwrt_br_wan_total_mbps
+      state: >
+        {{ (states('sensor.openwrt_br_wan_eth1_rx') | float(0)
+          + states('sensor.openwrt_br_wan_eth1_tx') | float(0)) | round(4) }}
+      unit_of_measurement: "Mbit/s"
+      device_class: data_rate
+      state_class: measurement
+      availability: >
+        {{ states('sensor.openwrt_br_wan_eth1_rx') not in ['unknown', 'unavailable']
+           and states('sensor.openwrt_br_wan_eth1_tx') not in ['unknown', 'unavailable'] }}
+
+    # For integration: convert Mbit/s to GB/h
+    - name: "OpenWrt WAN Total (br-WAN) (GB/h)"
+      unique_id: openwrt_br_wan_total_gb_per_hour
+      state: "{{ (states('sensor.openwrt_wan_total_br_wan_mbit_s') | float(0) * 0.45) | round(6) }}"
+      unit_of_measurement: "GB/h"
+      state_class: measurement
+      availability: "{{ states('sensor.openwrt_wan_total_br_wan_mbit_s') not in ['unknown', 'unavailable'] }}"
+
+    # ========== Storage Calculated Metrics ==========
+    - name: "USB Storage Total"
+      unique_id: openwrt_usb_storage_total_gib
+      state: >
+        {{ (states('sensor.usb_storage_used') | float(0) 
+          + states('sensor.usb_storage_free') | float(0)) | round(2) }}
+      unit_of_measurement: "GiB"
+      device_class: data_size
+      state_class: measurement
+      availability: >
+        {{ states('sensor.usb_storage_used') not in ['unknown', 'unavailable']
+           and states('sensor.usb_storage_free') not in ['unknown', 'unavailable'] }}
+
+    - name: "Disk sda1 Total Ops"
+      unique_id: openwrt_disk_sda1_total_ops
+      state: >
+        {{ (states('sensor.disk_sda1_read_ops') | float(0) 
+          + states('sensor.disk_sda1_write_ops') | float(0)) | round(2) }}
+      unit_of_measurement: "IOPS"
+      state_class: measurement
+      availability: >
+        {{ states('sensor.disk_sda1_read_ops') not in ['unknown', 'unavailable']
+           and states('sensor.disk_sda1_write_ops') not in ['unknown', 'unavailable'] }}
+
+    - name: "Disk sda1 Total Throughput"
+      unique_id: openwrt_disk_sda1_total_throughput
+      state: >
+        {{ (states('sensor.disk_sda1_read_throughput') | float(0) 
+          + states('sensor.disk_sda1_write_throughput') | float(0)) | round(3) }}
+      unit_of_measurement: "MB/s"
+      device_class: data_rate
+      state_class: measurement
+      availability: >
+        {{ states('sensor.disk_sda1_read_throughput') not in ['unknown', 'unavailable']
+           and states('sensor.disk_sda1_write_throughput') not in ['unknown', 'unavailable'] }}
+
+    # Disk utilization: (IO time in ms / interval in ms) * 100
+    # Assuming 30s collectd interval = 30000ms
+    - name: "Disk sda1 Utilization"
+      unique_id: openwrt_disk_sda1_utilization_pct
+      state: >
+        {% set io_time = states('sensor.disk_sda1_io_time_ms') | float(0) %}
+        {% set interval_ms = 30000 %}
+        {{ ((io_time / interval_ms) * 100) | round(2) if io_time > 0 else 0 }}
+      unit_of_measurement: "%"
+      state_class: measurement
+      availability: "{{ states('sensor.disk_sda1_io_time_ms') not in ['unknown', 'unavailable'] }}"
+
+    # Average I/O wait time per operation (when ops > 0)
+    - name: "Disk sda1 Avg IO Wait"
+      unique_id: openwrt_disk_sda1_avg_io_wait_ms
+      state: >
+        {% set total_ops = states('sensor.disk_sda1_total_ops') | float(0) %}
+        {% set read_time = states('sensor.disk_sda1_read_time_ms') | float(0) %}
+        {% set write_time = states('sensor.disk_sda1_write_time_ms') | float(0) %}
+        {% set total_time = read_time + write_time %}
+        {{ (total_time / total_ops) | round(2) if total_ops > 0 else 0 }}
+      unit_of_measurement: "ms"
+      state_class: measurement
+      availability: >
+        {{ states('sensor.disk_sda1_total_ops') not in ['unknown', 'unavailable']
+           and states('sensor.disk_sda1_read_time_ms') not in ['unknown', 'unavailable']
+           and states('sensor.disk_sda1_write_time_ms') not in ['unknown', 'unavailable'] }}
+           
+    - name: "OpenWrt CPU Utilization"
+      unique_id: openwrt_cpu_util_percent
+      unit_of_measurement: "%"
+      state_class: measurement
+      state: "{{ (100 - (states('sensor.openwrt_24_10_openwrt_cpu_idle') | float(0))) | round(2) }}"
+
+  binary_sensor:
+    # Temperature anomaly detection
+    - name: "OpenWrt Temperature High"
+      unique_id: openwrt_temp_high
+      state: "{{ (states('sensor.openwrt_temperature') | float(0)) >= 80 }}"
+      device_class: problem
+      delay_on: "00:02:00"
+      delay_off: "00:05:00"
+
+    # Temperature sustained rise
+    - name: "OpenWrt Temperature Rising"
+      unique_id: openwrt_temp_rising
+      state: >
+        {% set cur = states('sensor.openwrt_temperature') | float(0) %}
+        {% set avg = states('sensor.openwrt_temp_mean_15m') | float(0) %}
+        {{ cur > 60 and cur > avg + 5 }}
+      device_class: problem
+      delay_on: "00:05:00"
+      delay_off: "00:10:00"
+
+    # WAN spike detection
+    - name: "OpenWrt WAN Spike (br-WAN)"
+      unique_id: openwrt_wan_spike_br_wan
+      state: >
+        {% set cur = states('sensor.openwrt_wan_total_br_wan_mbit_s') | float(0) %}
+        {% set mean = states('sensor.openwrt_wan_total_mean_10m') | float(0) %}
+        {% set sd = states('sensor.openwrt_wan_total_sd_10m') | float(0) %}
+        {{ cur > 50 and sd > 0 and cur > (mean + 3 * sd) }}
+      device_class: problem
+      delay_on: "00:01:00"
+      delay_off: "00:02:00"
+
+    # ========== Storage Alert Sensors ==========
+    - name: "USB Storage Low Space"
+      unique_id: openwrt_usb_storage_low_space
+      state: "{{ (states('sensor.usb_storage_free_percent') | float(0)) < 10 }}"
+      device_class: problem
+      delay_on: "00:03:00"  # Delay 3 min to avoid false positives
+      delay_off: "00:05:00"
+
+    - name: "Disk High Utilization"
+      unique_id: openwrt_disk_high_utilization
+      state: "{{ (states('sensor.disk_sda1_utilization') | float(0)) > 80 }}"
+      device_class: problem
+      delay_on: "00:05:00"  # Trigger after 5 consecutive minutes
+      delay_off: "00:10:00"
+
+
+sensor:
+  # Integrate GB/h → total GB consumed
+  - platform: integration
+    name: "OpenWrt WAN Total (br-WAN) (GB)"
+    unique_id: openwrt_br_wan_total_gb
+    source: sensor.openwrt_wan_total_br_wan_gb_h
+    unit_time: h
+    method: trapezoidal
+    round: 3
+    max_sub_interval:
+      minutes: 5
+
+  # Statistics for spike detection (10 min window)
+  - platform: statistics
+    name: "OpenWrt WAN Total Mean 10m"
+    unique_id: openwrt_wan_total_mean_10m
+    entity_id: sensor.openwrt_wan_total_br_wan_mbit_s
+    state_characteristic: mean
+    max_age:
+      minutes: 10
+    sampling_size: 120
+
+  - platform: statistics
+    name: "OpenWrt WAN Total SD 10m"
+    unique_id: openwrt_wan_total_sd_10m
+    entity_id: sensor.openwrt_wan_total_br_wan_mbit_s
+    state_characteristic: standard_deviation
+    max_age:
+      minutes: 10
+    sampling_size: 120
+
+  # Temperature statistics (15 min)
+  - platform: statistics
+    name: "OpenWrt Temp Mean 15m"
+    unique_id: openwrt_temp_mean_15m
+    entity_id: sensor.openwrt_temperature
+    state_characteristic: mean
+    max_age:
+      minutes: 15
+    sampling_size: 180
+
+  # Memory growth detection (30 min)
+  - platform: statistics
+    name: "OpenWrt Memory Used Mean 30m"
+    unique_id: openwrt_mem_used_mean_30m
+    entity_id: sensor.openwrt_memory_used
+    state_characteristic: mean
+    max_age:
+      minutes: 30
+    sampling_size: 360
+
+
+binary_sensor:
+  # Sustained memory growth (trend sensor)
+  - platform: trend
+    sensors:
+      openwrt_memory_leak:
+        friendly_name: "OpenWrt Memory Growing"
+        entity_id: sensor.openwrt_memory_used
+        sample_duration: 3600  # 1 hour
+        min_gradient: 0.00028  # ~1 MiB/hour = 1048576 bytes/3600s
+        max_samples: 120
+
+
+utility_meter:
+  openwrt_wan_gb_daily:
+    source: sensor.openwrt_wan_total_br_wan_gb
+    cycle: daily
+    name: "OpenWrt WAN Daily"
+
+  openwrt_wan_gb_weekly:
+    source: sensor.openwrt_wan_total_br_wan_gb
+    cycle: weekly
+    name: "OpenWrt WAN Weekly"
+
+  openwrt_wan_gb_monthly:
+    source: sensor.openwrt_wan_total_br_wan_gb
+    cycle: monthly
+    name: "OpenWrt WAN Monthly"
+
+
+automation:
+  - id: openwrt_temp_high_notify
+    alias: "OpenWrt: Temperature high alert"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.openwrt_temperature_high
+        to: "on"
+    action:
+      - service: notify.notify
+        data:
+          title: "⚠️ OpenWrt Temperature Alert"
+          message: "Router temperature is high: {{ states('sensor.openwrt_temperature') }}°C"
+
+  - id: openwrt_temp_rising_notify
+    alias: "OpenWrt: Temperature rising continuously"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.openwrt_temperature_rising
+        to: "on"
+    action:
+      - service: notify.notify
+        data:
+          title: "⚠️ OpenWrt Temperature Rising"
+          message: >
+            Router temperature trending up: {{ states('sensor.openwrt_temperature') }}°C
+            (15m avg: {{ states('sensor.openwrt_temp_mean_15m') }}°C)
+
+  - id: openwrt_wan_spike_notify
+    alias: "OpenWrt: WAN traffic spike detected"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.openwrt_wan_spike_br_wan
+        to: "on"
+    action:
+      - service: notify.notify
+        data:
+          title: "⚠️ OpenWrt WAN Spike"
+          message: >
+            WAN spike (br-WAN): current {{ states('sensor.openwrt_wan_total_br_wan_mbit_s') }} Mbit/s,
+            mean {{ states('sensor.openwrt_wan_total_mean_10m') | round(2) }} Mbit/s,
+            stdev {{ states('sensor.openwrt_wan_total_sd_10m') | round(2) }}
+
+  - id: openwrt_memory_leak_notify
+    alias: "OpenWrt: Memory leak suspected"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.openwrt_memory_leak
+        to: "on"
+    action:
+      - service: notify.notify
+        data:
+          title: "⚠️ OpenWrt Memory Growing"
+          message: >
+            Router memory usage trending up: {{ states('sensor.openwrt_memory_used') }} MiB
+            (30m avg: {{ states('sensor.openwrt_memory_used_mean_30m') }} MiB)
+
+  # ========== Storage Automations ==========
+  - id: openwrt_usb_storage_low_space_notify
+    alias: "OpenWrt: USB Storage low space alert"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.usb_storage_low_space
+        to: "on"
+    condition:
+      # Prevent duplicate alerts within 6 hours
+      - condition: template
+        value_template: >
+          {% set last_triggered = state_attr('automation.openwrt_usb_storage_low_space_notify', 'last_triggered') %}
+          {{ last_triggered is none or (now() - last_triggered).total_seconds() > 21600 }}
+    action:
+      - service: notify.notify
+        data:
+          title: "⚠️ OpenWrt USB Storage Low"
+          message: >
+            USB storage is running low on space!
+            Free: {{ states('sensor.usb_storage_free') }} GiB ({{ states('sensor.usb_storage_free_percent') }}%)
+            Used: {{ states('sensor.usb_storage_used') }} GiB of {{ states('sensor.usb_storage_total') }} GiB
+
+  - id: openwrt_disk_high_utilization_notify
+    alias: "OpenWrt: Disk high utilization alert"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.disk_high_utilization
+        to: "on"
+    condition:
+      # Prevent duplicate alerts within 1 hour
+      - condition: template
+        value_template: >
+          {% set last_triggered = state_attr('automation.openwrt_disk_high_utilization_notify', 'last_triggered') %}
+          {{ last_triggered is none or (now() - last_triggered).total_seconds() > 3600 }}
+    action:
+      - service: notify.notify
+        data:
+          title: "⚠️ OpenWrt Disk High Utilization"
+          message: >
+            Disk sda1 utilization is high: {{ states('sensor.disk_sda1_utilization') }}%
+            IOPS: {{ states('sensor.disk_sda1_total_ops') }}
+            Throughput: {{ states('sensor.disk_sda1_total_throughput') }} MB/s
+            Pending operations: {{ states('sensor.disk_sda1_pending_operations') }}
